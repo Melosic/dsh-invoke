@@ -183,7 +183,8 @@ export function getMergedStorage(): {
   const projectStorage = readProjectStorage();
 
   if (!projectStorage) {
-    return { storage: userStorage, writable: hasProjectStorage() ? 'user' : 'user' };
+    // 有工作区时写入目标是项目级（addPrompt 会在写入时自动创建），故为 both
+    return { storage: userStorage, writable: hasProjectStorage() ? 'both' : 'user' };
   }
 
   // 合并分类：预置 + 用户自定义 + 项目自定义
