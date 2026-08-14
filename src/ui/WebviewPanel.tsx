@@ -12,15 +12,16 @@ import {
   GistIcon
 } from './icons';
 import { useTheme } from './theme';
+import { PromptFormModal } from './components/PromptFormModal';
+import { CategoryTree } from './components/CategoryTree';
 import {
   Prompt,
   getAllPrompts,
-  getAllCategories,
   deletePrompt,
   incrementUsage
 } from '../storage/manager';
 
-// ============ CSS 样式（内联） ============
+// ============ CSS 样式 ============
 
 const styles = {
   container: {
@@ -60,22 +61,31 @@ const styles = {
     color: 'var(--text-secondary, #4a4a5a)',
     transition: 'background 0.2s ease'
   },
+  mainLayout: {
+    display: 'flex' as const,
+    flex: 1,
+    overflow: 'hidden' as const,
+    gap: '16px'
+  },
+  sidebar: {
+    width: '180px',
+    flexShrink: 0,
+    overflowY: 'auto' as const,
+    paddingRight: '8px',
+    borderRight: '1px solid var(--border-color, #d0d7e2)'
+  },
+  contentArea: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    overflow: 'hidden' as const
+  },
   searchBar: {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    marginBottom: '14px'
-  },
-  searchInput: {
-    flex: 1,
-    padding: '6px 12px 6px 34px',
-    borderRadius: '6px',
-    border: '1px solid var(--border-color, #d0d7e2)',
-    background: 'var(--bg-input, #f0f2f6)',
-    color: 'var(--text-primary, #1e1e2f)',
-    fontSize: '13px',
-    outline: 'none',
-    transition: 'border 0.2s ease'
+    marginBottom: '12px',
+    flexShrink: 0
   },
   searchWrapper: {
     position: 'relative' as const,
@@ -88,6 +98,17 @@ const styles = {
     transform: 'translateY(-50%)',
     color: 'var(--text-muted, #7a7a8a)'
   },
+  searchInput: {
+    width: '100%',
+    padding: '6px 12px 6px 34px',
+    borderRadius: '6px',
+    border: '1px solid var(--border-color, #d0d7e2)',
+    background: 'var(--bg-input, #f0f2f6)',
+    color: 'var(--text-primary, #1e1e2f)',
+    fontSize: '13px',
+    outline: 'none',
+    transition: 'border 0.2s ease'
+  },
   stats: {
     fontSize: '12px',
     color: 'var(--text-muted, #7a7a8a)',
@@ -99,14 +120,20 @@ const styles = {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '10px',
-    alignContent: 'start'
+    alignContent: 'start',
+    paddingRight: '4px'
   },
   card: {
     background: 'var(--bg-card, #ffffff)',
     border: '1px solid var(--border-color, #d0d7e2)',
     borderRadius: '8px',
     padding: '12px 14px',
-    transition: 'border 0.2s ease, box-shadow 0.2s ease'
+    transition: 'border 0.2s ease, box-shadow 0.2s ease',
+    cursor: 'default'
+  },
+  cardHover: {
+    borderColor: 'var(--brand-blue, #2e9bff)',
+    boxShadow: '0 4px 12px rgba(46,155,255,0.08)'
   },
   cardHeader: {
     display: 'flex',
@@ -125,6 +152,9 @@ const styles = {
     gap: '2px',
     opacity: 0.4,
     transition: 'opacity 0.2s ease'
+  },
+  cardActionsVisible: {
+    opacity: 1
   },
   cardDesc: {
     fontSize: '13px',
@@ -149,6 +179,10 @@ const styles = {
     background: 'var(--tag-bg, #e8edf5)',
     color: 'var(--tag-text, #3a4a5a)',
     border: '1px solid var(--border-color, #d0d7e2)'
+  },
+  tagBuiltin: {
+    background: 'var(--brand-blue, #2e9bff)',
+    color: '#fff'
   },
   cardFooter: {
     display: 'flex',
@@ -181,7 +215,8 @@ const styles = {
     marginTop: '10px',
     borderTop: '1px solid var(--border-color, #d0d7e2)',
     fontSize: '12px',
-    color: 'var(--text-muted, #7a7a8a)'
+    color: 'var(--text-muted, #7a7a8a)',
+    flexShrink: 0
   },
   toolbarBtn: {
     display: 'inline-flex',
@@ -212,7 +247,9 @@ export const WebviewPanel: React.FC = () => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null);
+  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
 
   // 加载数据
   useEffect(() => {
@@ -220,19 +257,20 @@ export const WebviewPanel: React.FC = () => {
   }, []);
 
   const loadData = () => {
-    const allPrompts = getAllPrompts();
-    setPrompts(allPrompts);
-    setCategories(getAllCategories());
+    setPrompts(getAllPrompts());
+  };
+
+  // 分类变更时刷新（由 CategoryTree 触发）
+  const handleCategoryChange = () => {
+    loadData();
   };
 
   // 过滤逻辑
   const filteredPrompts = useMemo(() => {
     let result = prompts;
-
     if (selectedCategory) {
       result = result.filter(p => p.category === selectedCategory);
     }
-
     if (searchQuery.trim()) {
       const query = searchQuery.trim().toLowerCase();
       result = result.filter(p =>
@@ -242,11 +280,21 @@ export const WebviewPanel: React.FC = () => {
         p.body.toLowerCase().includes(query)
       );
     }
-
     return result;
   }, [prompts, selectedCategory, searchQuery]);
 
-  // 删除提示词
+  // ============ 操作函数 ============
+
+  const handleAdd = () => {
+    setEditingPrompt(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (prompt: Prompt) => {
+    setEditingPrompt(prompt);
+    setIsModalOpen(true);
+  };
+
   const handleDelete = (id: string) => {
     if (confirm('确定要删除这个提示词吗？')) {
       deletePrompt(id);
@@ -254,9 +302,7 @@ export const WebviewPanel: React.FC = () => {
     }
   };
 
-  // 复制提示词
   const handleCopy = (prompt: Prompt) => {
-    // 简单实现：直接复制正文，后续集成变量替换
     if (navigator.clipboard) {
       navigator.clipboard.writeText(prompt.body).then(() => {
         incrementUsage(prompt.id);
@@ -289,7 +335,6 @@ export const WebviewPanel: React.FC = () => {
   };
 
   const showToast = (message: string) => {
-    // 简单 Toast 实现
     const toast = document.createElement('div');
     toast.textContent = message;
     Object.assign(toast.style, {
@@ -313,32 +358,11 @@ export const WebviewPanel: React.FC = () => {
     }, 2500);
   };
 
-  // 分类点击
-  const handleCategoryClick = (category: string | null) => {
-    setSelectedCategory(category);
+  const handleModalSuccess = () => {
+    loadData();
   };
 
-  // 空状态
-  if (prompts.length === 0) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <span style={styles.title}>Prompt Vault</span>
-          <div style={styles.headerActions}>
-            <button style={styles.iconButton} onClick={() => {}}>
-              <PlusIcon size={18} />
-            </button>
-          </div>
-        </div>
-        <div style={styles.emptyState}>
-          <p>📭 暂无提示词</p>
-          <p style={{ fontSize: '13px', marginTop: '8px' }}>
-            点击「新增」添加第一条提示词
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // ============ 渲染 ============
 
   return (
     <div style={styles.container}>
@@ -346,68 +370,107 @@ export const WebviewPanel: React.FC = () => {
       <div style={styles.header}>
         <span style={styles.title}>Prompt Vault</span>
         <div style={styles.headerActions}>
-          <button style={styles.iconButton} onClick={() => {}}>
+          <button style={styles.iconButton} onClick={handleAdd} title="新增提示词">
             <PlusIcon size={18} />
           </button>
         </div>
       </div>
 
-      {/* 搜索框 */}
-      <div style={styles.searchBar}>
-        <div style={styles.searchWrapper}>
-          <span style={styles.searchIcon}>
-            <SearchIcon size={15} />
-          </span>
-          <input
-            style={styles.searchInput}
-            type="text"
-            placeholder="搜索标题、描述、标签..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+      {/* 主布局：侧边栏 + 内容区 */}
+      <div style={styles.mainLayout}>
+        {/* 侧边栏：分类树 */}
+        <div style={styles.sidebar}>
+          <CategoryTree
+            selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
+            onCategoryChange={handleCategoryChange}
           />
         </div>
-        <span style={styles.stats}>共 {filteredPrompts.length} 条</span>
-      </div>
 
-      {/* 卡片网格 */}
-      <div style={styles.cardGrid}>
-        {filteredPrompts.length === 0 ? (
-          <div style={styles.emptyState}>没有匹配的提示词</div>
-        ) : (
-          filteredPrompts.map(prompt => (
-            <div key={prompt.id} style={styles.card}>
-              <div style={styles.cardHeader}>
-                <span style={styles.cardTitle}>{prompt.title}</span>
-                <div style={styles.cardActions}>
-                  <button style={styles.iconButton} onClick={() => {}}>
-                    <EditIcon size={14} />
-                  </button>
-                  <button
-                    style={styles.iconButton}
-                    onClick={() => handleDelete(prompt.id)}
-                  >
-                    <DeleteIcon size={14} />
-                  </button>
-                </div>
-              </div>
-              <div style={styles.cardDesc}>{prompt.description}</div>
-              <div style={styles.cardTags}>
-                {prompt.tags.map(tag => (
-                  <span key={tag} style={styles.tag}>{tag}</span>
-                ))}
-              </div>
-              <div style={styles.cardFooter}>
-                <button
-                  style={styles.copyBtn}
-                  onClick={() => handleCopy(prompt)}
-                >
-                  <CopyIcon size={13} />
-                  复制
-                </button>
-              </div>
+        {/* 内容区 */}
+        <div style={styles.contentArea}>
+          {/* 搜索框 */}
+          <div style={styles.searchBar}>
+            <div style={styles.searchWrapper}>
+              <span style={styles.searchIcon}>
+                <SearchIcon size={15} />
+              </span>
+              <input
+                style={styles.searchInput}
+                type="text"
+                placeholder="搜索标题、描述、标签..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-          ))
-        )}
+            <span style={styles.stats}>共 {filteredPrompts.length} 条</span>
+          </div>
+
+          {/* 卡片网格 */}
+          <div style={styles.cardGrid}>
+            {filteredPrompts.length === 0 ? (
+              <div style={styles.emptyState}>
+                {searchQuery || selectedCategory ? '没有匹配的提示词' : '📭 暂无提示词，点击「新增」添加第一条'}
+              </div>
+            ) : (
+              filteredPrompts.map(prompt => {
+                const isHovered = hoveredCardId === prompt.id;
+                return (
+                  <div
+                    key={prompt.id}
+                    style={{
+                      ...styles.card,
+                      ...(isHovered ? styles.cardHover : {})
+                    }}
+                    onMouseEnter={() => setHoveredCardId(prompt.id)}
+                    onMouseLeave={() => setHoveredCardId(null)}
+                  >
+                    <div style={styles.cardHeader}>
+                      <span style={styles.cardTitle}>{prompt.title}</span>
+                      <div style={{
+                        ...styles.cardActions,
+                        ...(isHovered ? styles.cardActionsVisible : {})
+                      }}>
+                        <button
+                          style={styles.iconButton}
+                          onClick={() => handleEdit(prompt)}
+                          title="编辑"
+                        >
+                          <EditIcon size={14} />
+                        </button>
+                        <button
+                          style={styles.iconButton}
+                          onClick={() => handleDelete(prompt.id)}
+                          title="删除"
+                        >
+                          <DeleteIcon size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <div style={styles.cardDesc}>{prompt.description}</div>
+                    <div style={styles.cardTags}>
+                      {prompt.tags.map(tag => (
+                        <span key={tag} style={styles.tag}>{tag}</span>
+                      ))}
+                      {prompt.builtin && (
+                        <span style={{ ...styles.tag, ...styles.tagBuiltin }}>示例</span>
+                      )}
+                    </div>
+                    <div style={styles.cardFooter}>
+                      <button
+                        style={styles.copyBtn}
+                        onClick={() => handleCopy(prompt)}
+                      >
+                        <CopyIcon size={13} />
+                        复制
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
       </div>
 
       {/* 底部工具栏 */}
@@ -429,6 +492,14 @@ export const WebviewPanel: React.FC = () => {
           v0.1.0 · {prompts.length} 条提示词
         </span>
       </div>
+
+      {/* 表单弹窗 */}
+      <PromptFormModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleModalSuccess}
+        editPrompt={editingPrompt}
+      />
     </div>
   );
 };
