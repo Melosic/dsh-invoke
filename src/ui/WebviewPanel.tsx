@@ -15,6 +15,7 @@ import { useTheme } from './theme';
 import { PromptFormModal } from './components/PromptFormModal';
 import { CategoryTree } from './components/CategoryTree';
 import { VariableDialog } from './components/VariableDialog';
+import { ImportDialog } from './components/ImportDialog';
 import {
   Prompt,
   getAllPrompts,
@@ -22,6 +23,7 @@ import {
   incrementUsage
 } from '../storage/manager';
 import { renderTemplate, extractVariablesFromBody } from '../engine/template';
+import { exportToJSON, downloadJSON } from '../engine/import-export';
 
 // ============ CSS 样式 ============
 
@@ -260,6 +262,10 @@ export const WebviewPanel: React.FC = () => {
   const [varDialogPrompt, setVarDialogPrompt] = useState<Prompt | null>(null);
   const [varDialogAutoExtract, setVarDialogAutoExtract] = useState<Record<string, string>>({});
 
+  // ============ 导入对话框状态 ============
+
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+
   // 加载数据
   useEffect(() => {
     loadData();
@@ -421,6 +427,19 @@ export const WebviewPanel: React.FC = () => {
     loadData();
   };
 
+  // ============ 导入导出 ============
+
+  const handleExport = () => {
+    const json = exportToJSON();
+    downloadJSON(json, `prompts-backup-${new Date().toISOString().slice(0, 10)}.json`);
+    showToast('📤 导出成功');
+  };
+
+  const handleImportSuccess = () => {
+    loadData();
+    showToast('📥 导入成功');
+  };
+
   // ============ 渲染 ============
 
   return (
@@ -534,11 +553,11 @@ export const WebviewPanel: React.FC = () => {
 
       {/* 底部工具栏 */}
       <div style={styles.toolbar}>
-        <button style={styles.toolbarBtn}>
+        <button style={styles.toolbarBtn} onClick={() => setIsImportDialogOpen(true)}>
           <ImportIcon size={13} />
           导入
         </button>
-        <button style={styles.toolbarBtn}>
+        <button style={styles.toolbarBtn} onClick={handleExport}>
           <ExportIcon size={13} />
           导出
         </button>
@@ -575,6 +594,13 @@ export const WebviewPanel: React.FC = () => {
           autoExtractValues={varDialogAutoExtract}
         />
       )}
+
+      {/* 导入对话框 */}
+      <ImportDialog
+        isOpen={isImportDialogOpen}
+        onClose={() => setIsImportDialogOpen(false)}
+        onSuccess={handleImportSuccess}
+      />
     </div>
   );
 };
