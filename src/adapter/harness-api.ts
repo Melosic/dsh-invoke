@@ -18,7 +18,7 @@ export interface UIOptions {
  * 按优先级尝试多种方案，返回是否加载成功
  */
 export async function tryLoadUI(ctx: Context, renderContent: () => string | HTMLElement): Promise<boolean> {
-  // 方案1：尝试官方的 openPanel 方法（具体方法名需查阅 Harness API 文档）
+  // 方案1：尝试官方的 openPanel 方法
   if (typeof ctx.ui?.openPanel === 'function') {
     try {
       ctx.ui.openPanel({
@@ -48,7 +48,7 @@ export async function tryLoadUI(ctx: Context, renderContent: () => string | HTML
     }
   }
 
-  // 方案3：降级 —— 通过 iframe 注入（如果 Harness 支持）
+  // 方案3：降级 —— 通过 iframe 注入
   if (typeof ctx.ui?.openFrame === 'function') {
     try {
       ctx.ui.openFrame({
@@ -76,7 +76,6 @@ export function getWorkspaceRoot(ctx: Context): string | null {
   if (typeof ctx.workspace?.root === 'string') {
     return ctx.workspace.root;
   }
-  // 尝试从当前工作目录获取
   try {
     return process.cwd();
   } catch {
@@ -95,12 +94,14 @@ export function supportsEditorSelection(ctx: Context): boolean {
  * 获取当前选中的文本（实验性功能）
  */
 export function getSelectedText(ctx: Context): string | null {
-  if (!supportsEditorSelection(ctx)) {
+  const selection = ctx.editor?.getSelection;
+  if (typeof selection !== 'function') {
     return null;
   }
   try {
-    return ctx.editor.getSelection() || null;
+    return selection() || null;
   } catch {
     return null;
   }
 }
+

@@ -1,12 +1,19 @@
 // src/engine/import-export.ts
 
-import { PromptStorage, Prompt, readStorage, writeStorage, getAllPrompts } from '../storage/manager';
+import {
+  PromptStorage,
+  Prompt,
+  readStorage,
+  writeStorage,
+  getAllPrompts,
+  getMergedStorage
+} from '../storage/manager';
 
 /**
- * 导出数据为 JSON 字符串
+ * 导出数据为 JSON 字符串（合并用户级 + 项目级，保证备份完整）
  */
 export function exportToJSON(): string {
-  const storage = readStorage();
+  const { storage } = getMergedStorage();
   return JSON.stringify(storage, null, 2);
 }
 
@@ -23,7 +30,6 @@ export function importFromJSON(
   try {
     const data = JSON.parse(jsonString) as PromptStorage;
 
-    // 验证数据结构
     if (!data.version || !Array.isArray(data.prompts)) {
       return {
         success: false,
@@ -34,7 +40,6 @@ export function importFromJSON(
     }
 
     if (mode === 'overwrite') {
-      // 覆盖模式：直接写入
       writeStorage(data);
       return {
         success: true,
@@ -44,21 +49,17 @@ export function importFromJSON(
       };
     }
 
-    // 合并模式：合并提示词和分类
     const current = readStorage();
 
-    // 合并分类
     const mergedCategories = [...current.categories];
     const mergedCustomCategories = [...current.customCategories];
 
-    // 新增分类
     data.categories?.forEach(cat => {
       if (!mergedCategories.includes(cat) && !mergedCustomCategories.includes(cat)) {
         mergedCustomCategories.push(cat);
       }
     });
 
-    // 合并提示词：按 ID 去重
     const existingIds = new Set(current.prompts.map(p => p.id));
     let added = 0;
     let skipped = 0;
@@ -132,3 +133,4 @@ export function readJSONFromFile(file: File): Promise<string> {
     reader.readAsText(file);
   });
 }
+

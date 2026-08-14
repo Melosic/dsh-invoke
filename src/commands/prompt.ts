@@ -15,6 +15,8 @@ import {
 } from '../storage/manager';
 import { renderTemplate, extractVariablesFromBody } from '../engine/template';
 import { exportToJSON, importFromJSON } from '../engine/import-export';
+import { copyToClipboard } from './clipboard';
+import { removeAliasesByPromptId } from './alias';
 import * as fs from 'fs';
 
 /**
@@ -99,7 +101,6 @@ export function registerPromptCommands(ctx: Context) {
       const definedVars = prompt.variables || [];
 
       if (varNames.length === 0) {
-        // 无变量，直接复制
         console.log('✅ 提示词无变量，已复制到剪贴板');
         await copyToClipboard(prompt.body);
         incrementUsage(prompt.id);
@@ -129,7 +130,6 @@ export function registerPromptCommands(ctx: Context) {
         });
         if (v.required && !answer.trim()) {
           console.log('  此字段为必填，请重新输入');
-          // 简单重试：递归处理，但这里用循环方式
           let retryAnswer = answer;
           while (!retryAnswer.trim()) {
             retryAnswer = await new Promise<string>((resolve) => {
@@ -202,7 +202,6 @@ export function registerPromptCommands(ctx: Context) {
         return;
       }
 
-      // 提取变量
       const varNames = extractVariablesFromBody(body);
       const variables: { name: string; type: 'text' | 'textarea'; placeholder: string; required: boolean }[] = [];
 
@@ -275,7 +274,6 @@ export function registerPromptCommands(ctx: Context) {
       console.log('  正文 (使用 {{变量名}} 作为占位符):');
       const body = await question('  ', prompt.body);
 
-      // 更新变量
       const varNames = extractVariablesFromBody(body);
       const variables = varNames.map(name => ({
         name,
@@ -323,6 +321,8 @@ export function registerPromptCommands(ctx: Context) {
 
       if (answer.trim().toLowerCase() === 'y') {
         deletePrompt(prompt.id);
+        // 级联删除关联的别名
+        removeAliasesByPromptId(prompt.id);
         console.log('✅ 已删除');
       } else {
         console.log('❌ 已取消');
@@ -401,67 +401,8 @@ export function registerPromptCommands(ctx: Context) {
       }
     });
 
-  // ============ alias ============
-  promptCmd
-    .subcommand('alias <id> <alias>', '设置提示词的短别名')
-    .action(async (args: { id: string; alias: string }) => {
-      const prompt = getPromptById(args.id);
-      if (!prompt) {
-        console.log(`❌ 未找到 ID 为「${args.id}」的提示词`);
-        return;
-      }
-
-      // 存储别名到全局配置（这里用简单的内存存储，实际可用文件持久化）
-      // 为了演示，我们只是注册一个全局命令
-      const aliasCmd = ctx.command(args.alias, `快捷调用: ${prompt.title}`);
-      aliasCmd.action(async () => {
-        console.log(`📋 调用提示词: ${prompt.title}`);
-        // 复用 use 逻辑，但简化版：直接复制
-        const varNames = extractVariablesFromBody(prompt.body);
-        if (varNames.length === 0) {
-          await copyToClipboard(prompt.body);
-          incrementUsage(prompt.id);
-          console.log('✅ 已复制到剪贴板');
-        } else {
-          console.log(`⚠️ 提示词包含变量 (${varNames.join(', ')})，请使用 /prompt use ${prompt.id} 完整调用`);
-        }
-      });
-
-      console.log(`✅ 别名已设置: /${args.alias} -> ${prompt.title}`);
-    });
+  // ============ alias（别名管理已抽离至 ./alias 模块） ============
 
   console.log('[dsh-invoke] ✅ 命令注册完成');
 }
 
-/**
- * 复制到剪贴板（命令行版本）
- * 由于 Node.js 没有内置剪贴板 API，这里使用 child_process 调用系统命令
- */
-async function copyToClipboard(text: string): Promise<void> {
-  const { exec } = await import('child_process');
-  const { promisify } = await import('util');
-  const execAsync = promisify(exec);
-
-  // 根据平台选择复制命令
-  let command: string;
-  switch (process.platform) {
-    case 'darwin':
-      command = `echo "${text.replace(/"/g, '\\"')}" | pbcopy`;
-      break;
-    case 'win32':
-      command = `echo ${text.replace(/"/g, '\\"')} | clip`;
-      break;
-    default:
-      command = `echo "${text.replace(/"/g, '\\"')}" | xclip -selection clipboard`;
-      break;
-  }
-
-  try {
-    await execAsync(command);
-  } catch (error) {
-    console.log('⚠️ 无法复制到剪贴板，请手动复制以上内容');
-    console.log('--- 内容 ---');
-    console.log(text);
-    console.log('--- 内容结束 ---');
-  }
-}

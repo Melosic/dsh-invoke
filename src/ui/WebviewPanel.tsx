@@ -18,12 +18,14 @@ import { VariableDialog } from './components/VariableDialog';
 import { ImportDialog } from './components/ImportDialog';
 import {
   Prompt,
-  getAllPrompts,
+  Variable,
   getAllCategories,
+  getSortedPrompts,
   deletePrompt,
   incrementUsage
 } from '../storage/manager';
 import { renderTemplate, extractVariablesFromBody } from '../engine/template';
+import { prepareVariables, autoExtractValues } from '../engine/variable-resolver';
 import { exportToJSON, downloadJSON } from '../engine/import-export';
 
 // ============ CSS 样式 ============
@@ -248,7 +250,14 @@ const styles = {
 
 // ============ React 组件 ============
 
-export const WebviewPanel: React.FC = () => {
+export interface WebviewPanelProps {
+  /** 可选：获取编辑器当前选中文本的回调（由适配层注入，隔离 Harness API） */
+  getSelectedText?: () => string | null;
+}
+
+export const WebviewPanel: React.FC<WebviewPanelProps> = ({
+  getSelectedText: getSelectedTextProp
+}) => {
   const theme = useTheme();
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -263,6 +272,8 @@ export const WebviewPanel: React.FC = () => {
   const [isVarDialogOpen, setIsVarDialogOpen] = useState(false);
   const [varDialogPrompt, setVarDialogPrompt] = useState<Prompt | null>(null);
   const [varDialogAutoExtract, setVarDialogAutoExtract] = useState<Record<string, string>>({});
+  const [varDialogExtractMessage, setVarDialogExtractMessage] = useState('');
+  const [varDialogVars, setVarDialogVars] = useState<Variable[]>([]);
 
   // ============ 导入对话框状态 ============
 
@@ -271,7 +282,8 @@ export const WebviewPanel: React.FC = () => {
   // ============ 加载数据 ============
 
   const loadData = () => {
-    setPrompts(getAllPrompts());
+    // 使用智能排序（使用频次 + 最近使用时间综合得分）
+    setPrompts(getSortedPrompts('smart'));
     setCategories(getAllCategories());
   };
 
@@ -333,28 +345,21 @@ export const WebviewPanel: React.FC = () => {
       return;
     }
 
-    // 检查提示词是否定义了变量元数据
-    const definedVars = prompt.variables || [];
-
-    // 如果提示词没有定义变量元数据，但有变量占位符，
-    // 自动生成变量定义
-    const effectiveVars = definedVars.length > 0
-      ? definedVars
-      : varNames.map(name => ({
-          name,
-          type: 'text' as const,
-          placeholder: `请输入 ${name}`,
-          required: true
-        }));
-
-    // 尝试从编辑器选区自动提取（实验性功能）
-    // TODO: 后续与 Harness API 集成
-    const autoExtract: Record<string, string> = {};
+    // 解析变量定义（复用已有元数据，缺失部分自动推断类型）
+    const { variables: effectiveVars, autoExtract } = prepareVariables(
+      prompt.body,
+      prompt.variables || [],
+      // 尝试从编辑器选区自动提取（实验性）
+      getSelectedTextProp ? getSelectedTextProp() : null
+    );
 
     // 打开变量对话框
     setVarDialogPrompt(prompt);
-    setVarDialogAutoExtract(autoExtract);
+    setVarDialogVars(effectiveVars);
+    setVarDialogAutoExtract(autoExtract.values);
     setIsVarDialogOpen(true);
+    // 记录自动提取提示，用于对话框顶部展示
+    setVarDialogExtractMessage(autoExtract.message);
   };
 
   // 变量对话框确认回调
@@ -370,6 +375,8 @@ export const WebviewPanel: React.FC = () => {
     // 关闭对话框
     setIsVarDialogOpen(false);
     setVarDialogPrompt(null);
+    setVarDialogVars([]);
+    setVarDialogExtractMessage('');
   };
 
   // 复制到剪贴板（通用函数）
@@ -592,12 +599,15 @@ export const WebviewPanel: React.FC = () => {
           onClose={() => {
             setIsVarDialogOpen(false);
             setVarDialogPrompt(null);
+            setVarDialogVars([]);
+            setVarDialogExtractMessage('');
           }}
           onConfirm={handleVarDialogConfirm}
           title={varDialogPrompt.title}
           description="请填充以下变量后复制"
-          variables={varDialogPrompt.variables || []}
+          variables={varDialogVars}
           autoExtractValues={varDialogAutoExtract}
+          extractMessage={varDialogExtractMessage}
         />
       )}
 
@@ -612,3 +622,4 @@ export const WebviewPanel: React.FC = () => {
 };
 
 export default WebviewPanel;
+

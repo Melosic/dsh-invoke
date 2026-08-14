@@ -13,6 +13,7 @@ interface VariableDialogProps {
   variables: Variable[];
   initialValues?: Record<string, string>;
   autoExtractValues?: Record<string, string>;  // 从编辑器选区自动提取的值
+  extractMessage?: string;  // 自动提取的状态提示
 }
 
 export const VariableDialog: React.FC<VariableDialogProps> = ({
@@ -23,7 +24,8 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
   description,
   variables,
   initialValues = {},
-  autoExtractValues = {}
+  autoExtractValues = {},
+  extractMessage = ''
 }) => {
   const [values, setValues] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -31,7 +33,6 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
   // 初始化表单值
   useEffect(() => {
     if (isOpen) {
-      // 优先使用自动提取的值，其次使用初始值
       const merged: Record<string, string> = {};
       variables.forEach(v => {
         merged[v.name] = autoExtractValues[v.name] || initialValues[v.name] || '';
@@ -44,7 +45,6 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
   // 更新单个字段
   const handleChange = (name: string, value: string) => {
     setValues(prev => ({ ...prev, [name]: value }));
-    // 清除该字段的错误
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -56,7 +56,6 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
 
   // 提交
   const handleSubmit = () => {
-    // 验证必填字段
     const newErrors: Record<string, string> = {};
     variables.forEach(v => {
       if (v.required && (!values[v.name] || !values[v.name].trim())) {
@@ -72,8 +71,10 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
     onConfirm(values);
   };
 
-  // 自动提取提示
+  // 自动提取提示：是否有成功提取的值
   const hasAutoExtract = Object.keys(autoExtractValues).length > 0;
+  // 是否有提取状态消息需要展示（包括失败/不可用）
+  const hasExtractMessage = extractMessage.trim().length > 0;
 
   if (!isOpen) return null;
 
@@ -131,11 +132,13 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
         </p>
 
         {/* 自动提取提示 */}
-        {hasAutoExtract && (
+        {hasExtractMessage && (
           <div
             style={{
-              background: 'var(--brand-blue, #2e9bff)',
-              color: '#fff',
+              background: hasAutoExtract
+                ? 'var(--brand-blue, #2e9bff)'
+                : 'var(--tag-bg, #e8edf5)',
+              color: hasAutoExtract ? '#fff' : 'var(--text-secondary, #4a4a5a)',
               padding: '8px 12px',
               borderRadius: '6px',
               fontSize: '13px',
@@ -145,8 +148,8 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
               gap: '8px'
             }}
           >
-            <span>✨</span>
-            <span>已从编辑器中自动提取部分变量值</span>
+            <span>{hasAutoExtract ? '✨' : 'ℹ️'}</span>
+            <span>{extractMessage}</span>
           </div>
         )}
 
@@ -281,3 +284,4 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
     </div>
   );
 };
+
