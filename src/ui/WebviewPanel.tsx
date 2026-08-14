@@ -14,12 +14,14 @@ import {
 import { useTheme } from './theme';
 import { PromptFormModal } from './components/PromptFormModal';
 import { CategoryTree } from './components/CategoryTree';
+import { VariableDialog } from './components/VariableDialog';
 import {
   Prompt,
   getAllPrompts,
   deletePrompt,
   incrementUsage
 } from '../storage/manager';
+import { renderTemplate, extractVariablesFromBody } from '../engine/template';
 
 // ============ CSS 样式 ============
 
@@ -182,7 +184,8 @@ const styles = {
   },
   tagBuiltin: {
     background: 'var(--brand-blue, #2e9bff)',
-    color: '#fff'
+    color: '#fff',
+    borderColor: 'var(--brand-blue, #2e9bff)'
   },
   cardFooter: {
     display: 'flex',
@@ -251,6 +254,12 @@ export const WebviewPanel: React.FC = () => {
   const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
 
+  // ============ 变量对话框状态 ============
+
+  const [isVarDialogOpen, setIsVarDialogOpen] = useState(false);
+  const [varDialogPrompt, setVarDialogPrompt] = useState<Prompt | null>(null);
+  const [varDialogAutoExtract, setVarDialogAutoExtract] = useState<Record<string, string>>({});
+
   // 加载数据
   useEffect(() => {
     loadData();
@@ -260,7 +269,6 @@ export const WebviewPanel: React.FC = () => {
     setPrompts(getAllPrompts());
   };
 
-  // 分类变更时刷新（由 CategoryTree 触发）
   const handleCategoryChange = () => {
     loadData();
   };
@@ -302,31 +310,81 @@ export const WebviewPanel: React.FC = () => {
     }
   };
 
+  // ============ 复制流程（带变量替换） ============
+
   const handleCopy = (prompt: Prompt) => {
+    // 提取正文中的所有变量名
+    const varNames = extractVariablesFromBody(prompt.body);
+
+    // 如果没有变量，直接复制
+    if (varNames.length === 0) {
+      copyToClipboard(prompt.body, prompt.id);
+      return;
+    }
+
+    // 检查提示词是否定义了变量元数据
+    const definedVars = prompt.variables || [];
+
+    // 如果提示词没有定义变量元数据，但有变量占位符，
+    // 自动生成变量定义
+    const effectiveVars = definedVars.length > 0
+      ? definedVars
+      : varNames.map(name => ({
+          name,
+          type: 'text' as const,
+          placeholder: `请输入 ${name}`,
+          required: true
+        }));
+
+    // 尝试从编辑器选区自动提取（实验性功能）
+    // TODO: 后续与 Harness API 集成
+    const autoExtract: Record<string, string> = {};
+
+    // 打开变量对话框
+    setVarDialogPrompt(prompt);
+    setVarDialogAutoExtract(autoExtract);
+    setIsVarDialogOpen(true);
+  };
+
+  // 变量对话框确认回调
+  const handleVarDialogConfirm = (values: Record<string, string>) => {
+    if (!varDialogPrompt) return;
+
+    // 渲染模板
+    const rendered = renderTemplate(varDialogPrompt.body, values);
+
+    // 复制到剪贴板
+    copyToClipboard(rendered, varDialogPrompt.id);
+
+    // 关闭对话框
+    setIsVarDialogOpen(false);
+    setVarDialogPrompt(null);
+  };
+
+  // 复制到剪贴板（通用函数）
+  const copyToClipboard = (text: string, promptId: string) => {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(prompt.body).then(() => {
-        incrementUsage(prompt.id);
+      navigator.clipboard.writeText(text).then(() => {
+        incrementUsage(promptId);
         loadData();
         showToast('✅ 已复制到剪贴板');
       }).catch(() => {
-        fallbackCopy(prompt.body);
-        incrementUsage(prompt.id);
-        loadData();
+        fallbackCopy(text, promptId);
       });
     } else {
-      fallbackCopy(prompt.body);
-      incrementUsage(prompt.id);
-      loadData();
+      fallbackCopy(text, promptId);
     }
   };
 
-  const fallbackCopy = (text: string) => {
+  const fallbackCopy = (text: string, promptId: string) => {
     const textarea = document.createElement('textarea');
     textarea.value = text;
     document.body.appendChild(textarea);
     textarea.select();
     try {
       document.execCommand('copy');
+      incrementUsage(promptId);
+      loadData();
       showToast('✅ 已复制到剪贴板');
     } catch {
       showToast('⚠️ 复制失败，请手动复制');
@@ -334,6 +392,7 @@ export const WebviewPanel: React.FC = () => {
     document.body.removeChild(textarea);
   };
 
+  // Toast 提示
   const showToast = (message: string) => {
     const toast = document.createElement('div');
     toast.textContent = message;
@@ -500,6 +559,22 @@ export const WebviewPanel: React.FC = () => {
         onSuccess={handleModalSuccess}
         editPrompt={editingPrompt}
       />
+
+      {/* 变量替换对话框 */}
+      {varDialogPrompt && (
+        <VariableDialog
+          isOpen={isVarDialogOpen}
+          onClose={() => {
+            setIsVarDialogOpen(false);
+            setVarDialogPrompt(null);
+          }}
+          onConfirm={handleVarDialogConfirm}
+          title={varDialogPrompt.title}
+          description="请填充以下变量后复制"
+          variables={varDialogPrompt.variables || []}
+          autoExtractValues={varDialogAutoExtract}
+        />
+      )}
     </div>
   );
 };
