@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "categories": [
+    "开发",
+    "测试",
+    "文档",
+    "效率"
+  ],
+  "customCategories": [],
+  "prompts": [
+    {
+      "id": "code-review",
+      "title": "代码审查",
+      "description": "审查代码中的潜在问题，包括逻辑错误、安全漏洞、性能问题",
+      "category": "开发",
+      "tags": [
+        "review",
+        "quality",
+        "security"
+      ],
+      "body": "请审查以下代码，重点关注：\n1. 逻辑错误\n2. 安全漏洞\n3. 性能问题\n\n代码：\n{{code}}",
+      "variables": [
+        {
+          "name": "code",
+          "type": "text",
+          "placeholder": "请粘贴要审查的代码...",
+          "required": true
+        }
+      ],
+      "builtin": true,
+      "usageCount": 0,
+      "createdAt": "2026-08-14T17:49:51.774Z",
+      "updatedAt": "2026-08-14T17:49:51.775Z"
+    }
+  ]
+}

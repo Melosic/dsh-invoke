@@ -26,6 +26,37 @@ function isBrowserEnv(): boolean {
 }
 
 /**
+ * 鲁棒地查找 Harness 侧边栏容器。
+ * DSH 各版本 DOM 结构不固定（官方无稳定 data-sidebar 锚点），
+ * 按优先级尝试：稳定属性 → 模糊 class → 结构回退。
+ */
+function findSidebarContainer(): HTMLElement | null {
+  const selectors = ['[data-sidebar]', '[class*="sidebar" i]', 'aside', 'nav'];
+  for (const sel of selectors) {
+    try {
+      const el = document.querySelector<HTMLElement>(sel);
+      if (el) return el;
+    } catch {
+      /* 忽略无效选择器 */
+    }
+  }
+  // 结构回退：定位包含 "New session" 按钮的容器，向上找到带类名的最外层导航容器
+  const newSessionBtn = Array.from(document.querySelectorAll('button')).find(
+    (b) => /new\s*session/i.test((b.textContent ?? '').trim())
+  );
+  if (newSessionBtn) {
+    let cursor: HTMLElement | null = newSessionBtn.parentElement;
+    let best: HTMLElement | null = null;
+    while (cursor && cursor !== document.body) {
+      if (typeof cursor.className === 'string' && cursor.className.trim()) best = cursor;
+      cursor = cursor.parentElement;
+    }
+    return best;
+  }
+  return null;
+}
+
+/**
  * 使用 MutationObserver 自愈地在 Harness 侧边栏注入入口按钮。
  * 当 Harness 的侧边栏区域重新渲染时，observer 会自动重新注入。
  */
@@ -33,7 +64,7 @@ function injectSidebarButton(ctx: Context): () => void {
   if (!isBrowserEnv()) return () => {};
 
   const inject = () => {
-    const sidebar = document.querySelector('[data-sidebar]');
+    const sidebar = findSidebarContainer();
     if (!sidebar) return false;
 
     if (document.getElementById(SIDEBAR_BTN_ID)) return true;
