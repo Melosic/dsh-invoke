@@ -1,9 +1,9 @@
 // src/ui/components/VariableDialog.tsx
 
 import React, { useState, useEffect } from 'react';
-import { Variable } from '../../storage/manager';
-import { CopyIcon, CheckIcon, InfoIcon } from '../icons';
-import { injectStyles } from '../styles';
+import { Variable } from '../../storage/manager.js';
+import { CopyIcon, CheckIcon, InfoIcon } from '../icons.js';
+import { injectStyles } from '../styles.js';
 
 interface VariableDialogProps {
   isOpen: boolean;

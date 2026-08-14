@@ -1,12 +1,12 @@
 // src/engine/import-export.ts
 
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import {
   PromptStorage,
   readStorage,
   writeStorage,
   getMergedStorage
-} from '../storage/manager';
+} from '../storage/manager.js';
 
 // ============ 类型定义 ============
 

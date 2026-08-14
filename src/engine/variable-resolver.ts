@@ -5,8 +5,8 @@
 //   2. 从编辑器选中文本中自动提取变量值（实验性功能）
 //   3. 智能推断变量类型（text / textarea）
 
-import { Variable } from '../storage/manager';
-import { extractVariablesFromBody } from './template';
+import { Variable } from '../storage/manager.js';
+import { extractVariablesFromBody } from './template.js';
 
 // ============ 类型定义 ============
 

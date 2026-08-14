@@ -1,10 +1,10 @@
 // src/ui/components/CategoryTree.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { PlusIcon } from '../icons';
-import { injectStyles } from '../styles';
-import { Prompt, getAllCategories, addCustomCategory, removeCustomCategory } from '../../client/api';
-import { ConfirmDialog } from './ConfirmDialog';
+import { PlusIcon } from '../icons.js';
+import { injectStyles } from '../styles.js';
+import { Prompt, getAllCategories, addCustomCategory, removeCustomCategory } from '../../client/api.js';
+import { ConfirmDialog } from './ConfirmDialog.js';
 
 interface CategoryTreeProps {
   selectedCategory: string | null;

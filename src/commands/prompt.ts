@@ -3,7 +3,7 @@
 
 import { Context } from '@deepseek-ai/cordis';
 import type { CommandResult } from '@deepseek-ai/dsh-commands';
-import { getSortedPrompts, getAllPrompts } from '../storage/manager';
+import { getSortedPrompts, getAllPrompts } from '../storage/manager.js';
 
 // 导入 @deepseek-ai/dsh-commands 以激活其 declare module 类型增强，
 // 使 ctx.commands 在 Context 上可见（仅类型导入，无运行时副作用）。

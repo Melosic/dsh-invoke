@@ -15,14 +15,14 @@ import {
   MoonIcon,
   SunIcon,
   BookmarkIcon
-} from './icons';
-import { useTheme, ThemeMode } from './theme';
-import { injectStyles } from './styles';
-import { PromptFormModal } from './components/PromptFormModal';
-import { CategoryTree } from './components/CategoryTree';
-import { VariableDialog } from './components/VariableDialog';
-import { ImportDialog } from './components/ImportDialog';
-import { ConfirmDialog } from './components/ConfirmDialog';
+} from './icons.js';
+import { useTheme, ThemeMode } from './theme.js';
+import { injectStyles } from './styles.js';
+import { PromptFormModal } from './components/PromptFormModal.js';
+import { CategoryTree } from './components/CategoryTree.js';
+import { VariableDialog } from './components/VariableDialog.js';
+import { ImportDialog } from './components/ImportDialog.js';
+import { ConfirmDialog } from './components/ConfirmDialog.js';
 import {
   Prompt,
   Variable,
@@ -31,9 +31,9 @@ import {
   deletePrompt,
   incrementUsage,
   exportPrompts
-} from '../client/api';
-import { renderTemplate, extractVariablesFromBody } from '../engine/template';
-import { prepareVariables } from '../engine/variable-resolver';
+} from '../client/api.js';
+import { renderTemplate, extractVariablesFromBody } from '../engine/template.js';
+import { prepareVariables } from '../engine/variable-resolver.js';
 
 // ============ React 组件 ============
 

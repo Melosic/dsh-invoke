@@ -1,8 +1,8 @@
 // src/ui/components/ImportDialog.tsx
 
 import React, { useState, useEffect } from 'react';
-import { importPrompts } from '../../client/api';
-import { injectStyles } from '../styles';
+import { importPrompts } from '../../client/api.js';
+import { injectStyles } from '../styles.js';
 
 interface ImportDialogProps {
   isOpen: boolean;

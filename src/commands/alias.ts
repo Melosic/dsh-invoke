@@ -6,8 +6,8 @@ import type { CommandResult } from '@deepseek-ai/dsh-commands';
 import * as fs from 'fs';
 import * as path from 'path';
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
-import { getPromptById, incrementUsage } from '../storage/manager';
-import { extractVariablesFromBody } from '../engine/template';
+import { getPromptById, incrementUsage } from '../storage/manager.js';
+import { extractVariablesFromBody } from '../engine/template.js';
 
 // 导入 @deepseek-ai/dsh-commands 以激活其 declare module 类型增强，
 // 使 ctx.commands 在 Context 上可见（仅类型导入，无运行时副作用）。

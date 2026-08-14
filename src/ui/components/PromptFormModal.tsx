@@ -1,8 +1,8 @@
 // src/ui/components/PromptFormModal.tsx
 
 import React, { useState, useEffect } from 'react';
-import { Prompt, Variable, addPrompt, updatePrompt } from '../../client/api';
-import { injectStyles } from '../styles';
+import { Prompt, Variable, addPrompt, updatePrompt } from '../../client/api.js';
+import { injectStyles } from '../styles.js';
 
 interface PromptFormModalProps {
   isOpen: boolean;

@@ -18,14 +18,14 @@ import {
   getSortedPrompts,
   type Prompt,
   type PromptSortMode,
-} from '../storage/manager';
+} from '../storage/manager.js';
 import {
   exportToJSON,
   exportToYAML,
   importFromJSON,
   importFromYAML,
   type ImportResult,
-} from '../engine/import-export';
+} from '../engine/import-export.js';
 
 /** 路由前缀：client 端 fetch 的基路径 */
 export const API_BASE = '/api/dsh-invoke';

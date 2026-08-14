@@ -8,7 +8,7 @@
 import { Context } from '@deepseek-ai/cordis';
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { WebviewPanel } from '../ui/WebviewPanel';
+import { WebviewPanel } from '../ui/WebviewPanel.js';
 
 export const name = 'dsh-invoke-client';
 export const version = '0.1.0';

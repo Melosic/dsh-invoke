@@ -6,10 +6,10 @@
 //   3. 初始化存储上下文
 
 import { Context } from '@deepseek-ai/cordis';
-import { registerRoutes } from './host/routes';
-import { registerPromptCommands } from './commands/prompt';
-import { registerAliasCommands } from './commands/alias';
-import { initStorageContext } from './storage/context';
+import { registerRoutes } from './host/routes.js';
+import { registerPromptCommands } from './commands/prompt.js';
+import { registerAliasCommands } from './commands/alias.js';
+import { initStorageContext } from './storage/context.js';
 
 export const name = 'dsh-invoke';
 export const version = '0.1.0';

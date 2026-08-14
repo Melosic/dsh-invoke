@@ -7,7 +7,7 @@ import type {
   PromptSortMode,
   PromptStorage,
   Variable,
-} from '../storage/manager';
+} from '../storage/manager.js';
 
 export type { Prompt, PromptSortMode, PromptStorage, Variable };
 

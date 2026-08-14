@@ -1,6 +1,6 @@
 // src/engine/template.ts
 
-import { Variable } from '../storage/manager';
+import { Variable } from '../storage/manager.js';
 
 /**
  * 渲染模板：将 {{variable}} 替换为实际值

@@ -6,18 +6,18 @@ Prompt Vault & Invoker for DeepSeek Harness
 
 dsh-invoke 是 DeepSeek Harness 的社区插件，专注于提示词的管理与调用。它内置一条示例提示词作为参考模板，并允许你自由添加、编辑、删除、查看、搜索和分类管理自己的提示词。
 
-插件提供侧边栏图形界面（Feather Icons 图标库，风格简洁现代），让提示词管理像操作 Notion 数据库一样直观；同时保留完整的命令行支持，作为键盘流用户和特殊场景下的备用方案。
+插件以 **Host + Client 双端结构**运行：Host 端（Node）注册 HTTP 路由与 DSH 命令，Client 端（浏览器）在 Harness 侧边栏注入入口并挂载 React 面板，两者通过同源 `/api/dsh-invoke/*` 通信。
 
 ## 特性
 
 - **侧边栏 GUI 优先**：新增 / 编辑 / 删除 / 查看 / 搜索 / 分类管理，全部可视化完成
 - **快速调用（复制到剪贴板）**：点击「复制」→ 填充变量 → 复制 → 手动粘贴发送，不依赖 Harness 内部 DOM，100% 兼容
 - **变量替换**：支持 Mustache 风格占位符 `{{var}}`，调用时弹出对话框交互式填充，并支持从编辑器选区自动提取变量（实验性）
-- **分类树 + 实时搜索**：左侧分类筛选，顶部搜索框实时过滤（标题 / 描述 / 标签 / 正文）
-- **亮 / 暗主题自适应**：跟随 Harness 的 `data-ds-dark-theme` 机制自动切换
+- **分类树 + 实时搜索**：左侧分类筛选，顶部搜索框实时过滤（标题 / 描述 / 标签 / 正文），命中关键词高亮
+- **亮 / 暗主题自适应**：跟随 Harness 的 `data-ds-dark-theme` 机制自动切换，支持面板内手动覆盖
 - **双层存储合并**：用户级全局存储 + 项目级存储，项目级优先级更高
 - **导入 / 导出**：JSON / YAML 批量导入（合并 / 覆盖两种模式）、导出备份
-- **命令行完整支持**：`/prompt` 系列命令 + 别名系统 `/alias`
+- **命令行完整支持**：`/prompt`、`/prompt-list`、`/alias` 命令
 - **使用统计与智能排序**：基于使用频次与最近使用时间的综合得分排序
 
 ## 环境要求
@@ -27,31 +27,28 @@ dsh-invoke 是 DeepSeek Harness 的社区插件，专注于提示词的管理与
 
 ## 安装
 
+本插件作为 Cordis 插件挂载。将 `cordis.patch.yml` 交给 Harness 的 cordis loader 读取，或将其内容并入你的 patch 配置：
+
+```yaml
+- insert:
+    - id: dsh-invoke
+      name: dsh-invoke
+      config:
+        enabled: true
+```
+
+安装依赖：
+
 ```bash
 npm install dsh-invoke
 # 或
 pnpm add dsh-invoke
 ```
 
-在 Harness 中加载（`dsh.config.ts`）：
-
-```typescript
-import { defineConfig } from '@deepseek-ai/dsh';
-
-export default defineConfig({
-  plugins: ['dsh-invoke'],
-  invoke: {
-    storage: {
-      projectPath: '.harness/prompts.json'
-    }
-  }
-});
-```
-
 ## 快速上手
 
-1. 启动 Harness，侧边栏自动加载「Prompt Vault」面板。
-2. 浏览提示词：点击分类筛选，或使用搜索框快速定位。
+1. 启动 Harness，侧边栏自动注入「Prompt Vault」入口按钮。
+2. 点击入口打开面板。浏览提示词：点击分类筛选，或使用搜索框快速定位。
 3. 使用提示词：点击卡片上的「复制」→ 填写变量 → 点击「复制到剪贴板」→ 粘贴到输入框发送。
 4. 管理提示词：点击「新增」添加自定义提示词，点击卡片上的「编辑」或「删除」管理已有提示词。
 
@@ -71,29 +68,18 @@ export default defineConfig({
 
 ## 命令行使用（可选）
 
-大多数操作可通过侧边栏完成；命令行面向键盘流用户与降级场景。
+大多数操作可通过侧边栏完成；命令行面向键盘流用户与降级场景。当前命令：
 
 | 命令 | 说明 |
 | --- | --- |
-| `/prompt list [category]` | 列出所有提示词，可按分类筛选 |
-| `/prompt search <keyword>` | 搜索提示词 |
-| `/prompt use <id>` | 使用指定提示词（交互式填变量后复制） |
-| `/prompt add` | 交互式添加新提示词 |
-| `/prompt edit <id>` | 编辑指定提示词 |
-| `/prompt delete <id>` | 删除指定提示词 |
-| `/prompt category list` | 列出所有分类 |
-| `/prompt category add <name>` | 添加自定义分类 |
-| `/prompt category remove <name>` | 删除自定义分类 |
-| `/prompt export [path]` | 导出提示词库为 JSON/YAML 文件（按扩展名识别） |
-| `/prompt import <path> [merge\|overwrite]` | 从 JSON/YAML 文件导入提示词 |
-| `/alias list` | 列出所有别名 |
-| `/alias set <alias> <id>` | 设置短别名（如 `/cr` 调用代码审查） |
-| `/alias remove <alias>` | 删除别名 |
+| `/prompt` | 列出所有提示词（含分类、内置标记、描述） |
+| `/prompt-list` | 按分类分组列出所有提示词 |
+| `/alias` | 列出所有已注册别名及其指向的提示词 |
 
 ## 数据存储
 
-- **用户级（可写）**：`~/.deepseek-harness/prompts.user.json`
-- **项目级（可写，优先级高）**：`.harness/prompts.json`（可通过 `dsh.config.ts` 的 `invoke.storage.projectPath` 自定义）
+- **用户级（可写）**：`~/.dsh/prompts.user.json`（由 `@deepseek-ai/dsh-home-paths` 解析）
+- **项目级（可写，优先级高）**：`.harness/prompts.json`（当前打开工作区根目录下）
 
 ### 合并策略
 
@@ -126,75 +112,70 @@ export default defineConfig({
 
 ## 技术架构
 
+插件采用 **Host + Client 双端**结构，符合 DeepSeek Harness 社区插件规范：
+
 ```
-用户交互层（UI / CLI）
-        ↓
-命令注册层（commands/）
-├── prompt.ts     # 主命令注册
-└── alias.ts      # 别名管理与冲突检测
-        ↓
-业务逻辑层（engine/ + storage/）
-├── template.ts            # 模板渲染（{{var}} 替换）
-├── variable-resolver.ts   # 变量提取与解析（含实验性自动提取）
-├── import-export.ts       # JSON / YAML 导入导出
-└── manager.ts             # 双层存储合并（user 全局 + user 项目）
-        ↓
-Harness API 适配层（adapter/）
-└── harness-api.ts         # 隔离官方不稳定变更
-        ↓
-DeepSeek Harness 核心
+             DeepSeek Harness
+        ┌────────────────────┐
+        │  Host 端（Node）    │
+        │  src/index.ts       │
+        │   ├─ host/routes.ts │◄── HTTP /api/dsh-invoke/*
+        │   ├─ commands/*     │◄── DSH 命令 /prompt /alias
+        │   ├─ storage/*      │── 双层存储合并
+        │   └─ engine/*       │── 模板 / 导入导出
+        └────────┬───────────┘
+                 │ 同源 fetch
+        ┌────────┴───────────┐
+        │  Client 端（浏览器）│
+        │  src/client/index.ts│── 侧边栏按钮注入 + 面板挂载
+        │  src/client/api.ts │── fetch 封装
+        │  src/ui/*          │── React 面板（深浅主题）
+        └────────────────────┘
 ```
 
-设计要点：
-
-- **GUI 优先**：侧边栏界面覆盖 90% 以上使用场景，命令行作为备用方案。
-- **适配层隔离**：所有对 Harness 官方 API 的调用封装在 `adapter/harness-api.ts`。
-- **降级优先**：UI 加载失败时自动回退至命令行，保证功能在任何环境下可用。
-- **UI 集成方案（优先级从高到低）**：`ctx.ui.openPanel` / `ctx.ui.registerWebview` → iframe 嵌入 → 命令行降级。
-
-## 项目结构
+### 源码结构
 
 ```
 dsh-invoke/
 ├── package.json
-├── tsconfig.json
-├── README.md
-├── LICENSE
-├── vendor/dsh-stub/          # @deepseek-ai/dsh 本地类型 stub（构建用）
+├── cordis.patch.yml        # 插件挂载补丁
+├── tsconfig.json           # Host 端编译
+├── tsconfig.client.json    # Client 端编译
 ├── src/
-│   ├── index.ts              # 插件入口
-│   ├── adapter/
-│   │   └── harness-api.ts    # Harness API 适配层
+│   ├── index.ts            # Host 端插件入口
+│   ├── host/
+│   │   └── routes.ts       # HTTP 路由层（CRUD API）
+│   ├── client/
+│   │   ├── index.ts        # 浏览器入口（侧边栏注入 + 挂载）
+│   │   └── api.ts          # fetch API 封装
 │   ├── storage/
-│   │   ├── context.ts        # 存储上下文（工作区/路径配置）
-│   │   └── manager.ts        # 双层合并 + CRUD + 智能排序
+│   │   ├── context.ts      # 存储上下文（工作区/路径配置）
+│   │   └── manager.ts      # 双层合并 + CRUD + 智能排序
 │   ├── engine/
-│   │   ├── template.ts       # 变量替换（{{var}}）
+│   │   ├── template.ts     # 变量替换（{{var}}）
 │   │   ├── variable-resolver.ts  # 变量提取（含实验性自动提取）
 │   │   └── import-export.ts  # JSON / YAML 导入导出
 │   ├── commands/
-│   │   ├── prompt.ts         # 主命令注册
-│   │   ├── alias.ts          # 别名管理与冲突检测
-│   │   └── clipboard.ts      # 跨平台剪贴板复制
+│   │   ├── prompt.ts       # 主命令注册
+│   │   ├── alias.ts        # 别名管理与冲突检测
+│   │   └── clipboard.ts    # 跨平台剪贴板复制（Node child_process）
 │   └── ui/
-│       ├── theme.ts          # 主题适配（亮/暗色）
-│       ├── icons.tsx         # Feather Icons 内联 SVG
-│       ├── styles.ts         # 设计系统（CSS 变量）
+│       ├── theme.ts        # 主题适配（亮/暗色）
+│       ├── icons.tsx       # Feather Icons 内联 SVG
+│       ├── styles.ts       # 设计系统（CSS 变量）
 │       ├── WebviewPanel.tsx  # 主面板（React 18）
-│       └── components/       # 卡片、表单、分类树、变量/导入对话框
-└── tests/                    # 待补充
+│       └── components/     # 卡片、表单、分类树、变量/导入对话框
+└── tests/                  # Jest 单元测试
 ```
 
 ## 开发
 
 ```bash
 npm install
-npm run build   # tsc 构建到 dist/
-npm run test    # 运行测试（待补充）
-npm run lint    # ESLint 检查（待补充）
+npm run build          # Host 端编译（tsc -p tsconfig.json）
+npm run build:client   # Client 端编译（tsc -p tsconfig.client.json）
+npm run test           # 运行 Jest 单元测试
 ```
-
-> 说明：`@deepseek-ai/dsh` 由 Harness 运行时提供、未发布到 npm registry，本地构建通过 `vendor/dsh-stub` 提供类型声明满足依赖。
 
 ## 路线图
 
@@ -207,7 +188,7 @@ npm run lint    # ESLint 检查（待补充）
 | P1 | 导入 / 导出 | 已完成（JSON / YAML） |
 | P1 | 2 列网格卡片布局 | 已完成 |
 | P1 | 变量替换（{{var}}） | 已完成 |
-| P1 | 独立 Webview 图形界面 | 已完成 |
+| P1 | 侧边栏 GUI（Host + Client） | 已完成 |
 | P1 | 别名系统（含冲突检测） | 已完成 |
 | P2 | 项目级自动加载与双层合并 | 已完成 |
 | P2 | 使用统计与智能排序 | 已完成 |

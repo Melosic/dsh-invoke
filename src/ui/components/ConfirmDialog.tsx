@@ -1,7 +1,7 @@
 // src/ui/components/ConfirmDialog.tsx
 
 import React, { useState, useEffect } from 'react';
-import { injectStyles } from '../styles';
+import { injectStyles } from '../styles.js';
 
 interface ConfirmDialogProps {
   isOpen: boolean;

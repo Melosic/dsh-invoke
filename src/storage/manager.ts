@@ -8,7 +8,7 @@ import {
   getProjectStoragePath,
   hasProjectStorage,
   getWorkspaceRoot
-} from './context';
+} from './context.js';
 
 // ============ 类型定义 ============
 
