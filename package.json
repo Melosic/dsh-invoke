@@ -1,0 +1,38 @@
+{
+  "name": "dsh-invoke",
+  "version": "0.1.0",
+  "description": "Prompt Vault & Invoker for DeepSeek Harness — 管理、分类、快速调用提示词，支持侧边栏 GUI",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "jest",
+    "lint": "eslint src --ext .ts,.tsx"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "harness-plugin",
+    "prompt-management",
+    "prompt-vault",
+    "ai-agent"
+  ],
+  "author": "你的名字",
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.1.0 <0.2.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh": "^0.1.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
