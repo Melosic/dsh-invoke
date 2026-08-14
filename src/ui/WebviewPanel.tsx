@@ -12,6 +12,7 @@ import {
   GistIcon
 } from './icons';
 import { useTheme } from './theme';
+import { injectStyles } from './styles';
 import { PromptFormModal } from './components/PromptFormModal';
 import { CategoryTree } from './components/CategoryTree';
 import { VariableDialog } from './components/VariableDialog';
@@ -25,228 +26,8 @@ import {
   incrementUsage
 } from '../storage/manager';
 import { renderTemplate, extractVariablesFromBody } from '../engine/template';
-import { prepareVariables, autoExtractValues } from '../engine/variable-resolver';
+import { prepareVariables } from '../engine/variable-resolver';
 import { exportToJSON, downloadJSON } from '../engine/import-export';
-
-// ============ CSS 样式 ============
-
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    height: '100%',
-    padding: '16px 20px',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    color: 'var(--text-primary, #1e1e2f)',
-    background: 'var(--bg-primary, #ffffff)',
-    transition: 'background 0.2s ease, color 0.2s ease'
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: '12px'
-  },
-  title: {
-    fontSize: '16px',
-    fontWeight: 600,
-    color: 'var(--brand-blue, #2e9bff)'
-  },
-  headerActions: {
-    display: 'flex',
-    gap: '6px'
-  },
-  iconButton: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '6px',
-    border: 'none',
-    background: 'transparent',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    color: 'var(--text-secondary, #4a4a5a)',
-    transition: 'background 0.2s ease'
-  },
-  mainLayout: {
-    display: 'flex' as const,
-    flex: 1,
-    overflow: 'hidden' as const,
-    gap: '16px'
-  },
-  sidebar: {
-    width: '180px',
-    flexShrink: 0,
-    overflowY: 'auto' as const,
-    paddingRight: '8px',
-    borderRight: '1px solid var(--border-color, #d0d7e2)'
-  },
-  contentArea: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    overflow: 'hidden' as const
-  },
-  searchBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    marginBottom: '12px',
-    flexShrink: 0
-  },
-  searchWrapper: {
-    position: 'relative' as const,
-    flex: 1
-  },
-  searchIcon: {
-    position: 'absolute' as const,
-    left: '10px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    color: 'var(--text-muted, #7a7a8a)'
-  },
-  searchInput: {
-    width: '100%',
-    padding: '6px 12px 6px 34px',
-    borderRadius: '6px',
-    border: '1px solid var(--border-color, #d0d7e2)',
-    background: 'var(--bg-input, #f0f2f6)',
-    color: 'var(--text-primary, #1e1e2f)',
-    fontSize: '13px',
-    outline: 'none',
-    transition: 'border 0.2s ease'
-  },
-  stats: {
-    fontSize: '12px',
-    color: 'var(--text-muted, #7a7a8a)',
-    whiteSpace: 'nowrap' as const
-  },
-  cardGrid: {
-    flex: 1,
-    overflowY: 'auto' as const,
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '10px',
-    alignContent: 'start',
-    paddingRight: '4px'
-  },
-  card: {
-    background: 'var(--bg-card, #ffffff)',
-    border: '1px solid var(--border-color, #d0d7e2)',
-    borderRadius: '8px',
-    padding: '12px 14px',
-    transition: 'border 0.2s ease, box-shadow 0.2s ease',
-    cursor: 'default'
-  },
-  cardHover: {
-    borderColor: 'var(--brand-blue, #2e9bff)',
-    boxShadow: '0 4px 12px rgba(46,155,255,0.08)'
-  },
-  cardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: '8px',
-    marginBottom: '4px'
-  },
-  cardTitle: {
-    fontSize: '14px',
-    fontWeight: 600,
-    color: 'var(--text-primary, #1e1e2f)'
-  },
-  cardActions: {
-    display: 'flex',
-    gap: '2px',
-    opacity: 0.4,
-    transition: 'opacity 0.2s ease'
-  },
-  cardActionsVisible: {
-    opacity: 1
-  },
-  cardDesc: {
-    fontSize: '13px',
-    color: 'var(--text-secondary, #4a4a5a)',
-    lineHeight: 1.4,
-    display: '-webkit-box',
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical' as const,
-    overflow: 'hidden',
-    marginBottom: '4px'
-  },
-  cardTags: {
-    display: 'flex',
-    flexWrap: 'wrap' as const,
-    gap: '4px',
-    marginBottom: '6px'
-  },
-  tag: {
-    fontSize: '10px',
-    padding: '1px 8px',
-    borderRadius: '12px',
-    background: 'var(--tag-bg, #e8edf5)',
-    color: 'var(--tag-text, #3a4a5a)',
-    border: '1px solid var(--border-color, #d0d7e2)'
-  },
-  tagBuiltin: {
-    background: 'var(--brand-blue, #2e9bff)',
-    color: '#fff',
-    borderColor: 'var(--brand-blue, #2e9bff)'
-  },
-  cardFooter: {
-    display: 'flex',
-    justifyContent: 'flex-end'
-  },
-  copyBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '3px 12px',
-    borderRadius: '6px',
-    border: 'none',
-    background: 'var(--brand-blue, #2e9bff)',
-    color: '#ffffff',
-    fontSize: '12px',
-    cursor: 'pointer',
-    transition: 'background 0.2s ease'
-  },
-  emptyState: {
-    gridColumn: '1 / -1',
-    textAlign: 'center' as const,
-    padding: '40px 0',
-    color: 'var(--text-muted, #7a7a8a)'
-  },
-  toolbar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    paddingTop: '10px',
-    marginTop: '10px',
-    borderTop: '1px solid var(--border-color, #d0d7e2)',
-    fontSize: '12px',
-    color: 'var(--text-muted, #7a7a8a)',
-    flexShrink: 0
-  },
-  toolbarBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '3px 10px',
-    borderRadius: '6px',
-    border: '1px solid var(--border-color, #d0d7e2)',
-    background: 'var(--bg-secondary, #f3f5f9)',
-    color: 'var(--text-secondary, #4a4a5a)',
-    fontSize: '11px',
-    cursor: 'pointer',
-    transition: 'border 0.2s ease'
-  },
-  spacer: {
-    flex: 1
-  },
-  statusBar: {
-    fontSize: '11px',
-    color: 'var(--text-muted, #7a7a8a)'
-  }
-};
 
 // ============ React 组件 ============
 
@@ -258,31 +39,32 @@ export interface WebviewPanelProps {
 export const WebviewPanel: React.FC<WebviewPanelProps> = ({
   getSelectedText: getSelectedTextProp
 }) => {
-  const theme = useTheme();
+  useTheme(); // 主题通过 CSS 变量 + body[data-ds-dark-theme] 自动适配
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null);
-  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
 
-  // ============ 变量对话框状态 ============
-
+  // 变量对话框状态
   const [isVarDialogOpen, setIsVarDialogOpen] = useState(false);
   const [varDialogPrompt, setVarDialogPrompt] = useState<Prompt | null>(null);
   const [varDialogAutoExtract, setVarDialogAutoExtract] = useState<Record<string, string>>({});
   const [varDialogExtractMessage, setVarDialogExtractMessage] = useState('');
   const [varDialogVars, setVarDialogVars] = useState<Variable[]>([]);
 
-  // ============ 导入对话框状态 ============
-
+  // 导入对话框状态
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+
+  // 注入样式（幂等）
+  useEffect(() => {
+    injectStyles();
+  }, []);
 
   // ============ 加载数据 ============
 
   const loadData = () => {
-    // 使用智能排序（使用频次 + 最近使用时间综合得分）
     setPrompts(getSortedPrompts('smart'));
     setCategories(getAllCategories());
   };
@@ -336,56 +118,43 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
   // ============ 复制流程（带变量替换） ============
 
   const handleCopy = (prompt: Prompt) => {
-    // 提取正文中的所有变量名
     const varNames = extractVariablesFromBody(prompt.body);
 
-    // 如果没有变量，直接复制
     if (varNames.length === 0) {
       copyToClipboard(prompt.body, prompt.id);
       return;
     }
 
-    // 解析变量定义（复用已有元数据，缺失部分自动推断类型）
     const { variables: effectiveVars, autoExtract } = prepareVariables(
       prompt.body,
       prompt.variables || [],
-      // 尝试从编辑器选区自动提取（实验性）
       getSelectedTextProp ? getSelectedTextProp() : null
     );
 
-    // 打开变量对话框
     setVarDialogPrompt(prompt);
     setVarDialogVars(effectiveVars);
     setVarDialogAutoExtract(autoExtract.values);
     setIsVarDialogOpen(true);
-    // 记录自动提取提示，用于对话框顶部展示
     setVarDialogExtractMessage(autoExtract.message);
   };
 
-  // 变量对话框确认回调
   const handleVarDialogConfirm = (values: Record<string, string>) => {
     if (!varDialogPrompt) return;
-
-    // 渲染模板
     const rendered = renderTemplate(varDialogPrompt.body, values);
-
-    // 复制到剪贴板
     copyToClipboard(rendered, varDialogPrompt.id);
-
-    // 关闭对话框
     setIsVarDialogOpen(false);
     setVarDialogPrompt(null);
     setVarDialogVars([]);
     setVarDialogExtractMessage('');
   };
 
-  // 复制到剪贴板（通用函数）
+  // 复制到剪贴板
   const copyToClipboard = (text: string, promptId: string) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text).then(() => {
         incrementUsage(promptId);
         loadData();
-        showToast('✅ 已复制到剪贴板');
+        showToast('已复制到剪贴板');
       }).catch(() => {
         fallbackCopy(text, promptId);
       });
@@ -403,9 +172,9 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
       document.execCommand('copy');
       incrementUsage(promptId);
       loadData();
-      showToast('✅ 已复制到剪贴板');
+      showToast('已复制到剪贴板');
     } catch {
-      showToast('⚠️ 复制失败，请手动复制');
+      showToast('复制失败，请手动复制');
     }
     document.body.removeChild(textarea);
   };
@@ -413,21 +182,8 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
   // Toast 提示
   const showToast = (message: string) => {
     const toast = document.createElement('div');
+    toast.className = 'pv-toast';
     toast.textContent = message;
-    Object.assign(toast.style, {
-      position: 'fixed',
-      bottom: '30px',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      padding: '8px 20px',
-      borderRadius: '20px',
-      background: 'var(--toast-bg, #2d2d3d)',
-      color: 'var(--toast-text, #ffffff)',
-      fontSize: '13px',
-      zIndex: '9999',
-      boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
-      transition: 'opacity 0.3s ease'
-    });
     document.body.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
@@ -444,32 +200,30 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
   const handleExport = () => {
     const json = exportToJSON();
     downloadJSON(json, `prompts-backup-${new Date().toISOString().slice(0, 10)}.json`);
-    showToast('📤 导出成功');
+    showToast('导出成功');
   };
 
   const handleImportSuccess = () => {
     loadData();
-    showToast('📥 导入成功');
+    showToast('导入成功');
   };
 
   // ============ 渲染 ============
 
   return (
-    <div style={styles.container}>
+    <div className="pv-container">
       {/* 顶栏 */}
-      <div style={styles.header}>
-        <span style={styles.title}>Prompt Vault</span>
-        <div style={styles.headerActions}>
-          <button style={styles.iconButton} onClick={handleAdd} title="新增提示词">
-            <PlusIcon size={18} />
-          </button>
-        </div>
+      <div className="pv-header">
+        <span className="pv-title">Prompt Vault</span>
+        <button className="pv-icon-btn" onClick={handleAdd} title="新增提示词">
+          <PlusIcon size={16} />
+        </button>
       </div>
 
-      {/* 主布局：侧边栏 + 内容区 */}
-      <div style={styles.mainLayout}>
-        {/* 侧边栏：分类树 */}
-        <div style={styles.sidebar}>
+      {/* 主布局 */}
+      <div className="pv-main">
+        {/* 侧边栏 */}
+        <div className="pv-sidebar">
           <CategoryTree
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
@@ -478,107 +232,93 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
         </div>
 
         {/* 内容区 */}
-        <div style={styles.contentArea}>
+        <div className="pv-content">
           {/* 搜索框 */}
-          <div style={styles.searchBar}>
-            <div style={styles.searchWrapper}>
-              <span style={styles.searchIcon}>
-                <SearchIcon size={15} />
+          <div className="pv-searchbar">
+            <div className="pv-search-wrap">
+              <span className="pv-search-icon">
+                <SearchIcon size={14} />
               </span>
               <input
-                style={styles.searchInput}
+                className="pv-search-input"
                 type="text"
                 placeholder="搜索标题、描述、标签..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <span style={styles.stats}>共 {filteredPrompts.length} 条</span>
+            <span className="pv-stats">共 {filteredPrompts.length} 条</span>
           </div>
 
           {/* 卡片网格 */}
-          <div style={styles.cardGrid}>
+          <div className="pv-grid">
             {filteredPrompts.length === 0 ? (
-              <div style={styles.emptyState}>
-                {searchQuery || selectedCategory ? '没有匹配的提示词' : '📭 暂无提示词，点击「新增」添加第一条'}
+              <div className="pv-empty">
+                {searchQuery || selectedCategory ? '没有匹配的提示词' : '暂无提示词，点击「+」添加第一条'}
               </div>
             ) : (
-              filteredPrompts.map(prompt => {
-                const isHovered = hoveredCardId === prompt.id;
-                return (
-                  <div
-                    key={prompt.id}
-                    style={{
-                      ...styles.card,
-                      ...(isHovered ? styles.cardHover : {})
-                    }}
-                    onMouseEnter={() => setHoveredCardId(prompt.id)}
-                    onMouseLeave={() => setHoveredCardId(null)}
-                  >
-                    <div style={styles.cardHeader}>
-                      <span style={styles.cardTitle}>{prompt.title}</span>
-                      <div style={{
-                        ...styles.cardActions,
-                        ...(isHovered ? styles.cardActionsVisible : {})
-                      }}>
-                        <button
-                          style={styles.iconButton}
-                          onClick={() => handleEdit(prompt)}
-                          title="编辑"
-                        >
-                          <EditIcon size={14} />
-                        </button>
-                        <button
-                          style={styles.iconButton}
-                          onClick={() => handleDelete(prompt.id)}
-                          title="删除"
-                        >
-                          <DeleteIcon size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <div style={styles.cardDesc}>{prompt.description}</div>
-                    <div style={styles.cardTags}>
-                      {prompt.tags.map(tag => (
-                        <span key={tag} style={styles.tag}>{tag}</span>
-                      ))}
-                      {prompt.builtin && (
-                        <span style={{ ...styles.tag, ...styles.tagBuiltin }}>示例</span>
-                      )}
-                    </div>
-                    <div style={styles.cardFooter}>
+              filteredPrompts.map(prompt => (
+                <div key={prompt.id} className="pv-card">
+                  <div className="pv-card-header">
+                    <span className="pv-card-title">{prompt.title}</span>
+                    <div className="pv-card-actions">
                       <button
-                        style={styles.copyBtn}
-                        onClick={() => handleCopy(prompt)}
+                        className="pv-card-action-btn"
+                        onClick={() => handleEdit(prompt)}
+                        title="编辑"
                       >
-                        <CopyIcon size={13} />
-                        复制
+                        <EditIcon size={13} />
+                      </button>
+                      <button
+                        className="pv-card-action-btn danger"
+                        onClick={() => handleDelete(prompt.id)}
+                        title="删除"
+                      >
+                        <DeleteIcon size={13} />
                       </button>
                     </div>
                   </div>
-                );
-              })
+                  <div className="pv-card-desc">{prompt.description}</div>
+                  <div className="pv-card-tags">
+                    {prompt.tags.map(tag => (
+                      <span key={tag} className="pv-tag">{tag}</span>
+                    ))}
+                    {prompt.builtin && (
+                      <span className="pv-tag pv-tag-builtin">示例</span>
+                    )}
+                  </div>
+                  <div className="pv-card-footer">
+                    <button
+                      className="pv-btn-primary"
+                      onClick={() => handleCopy(prompt)}
+                    >
+                      <CopyIcon size={12} />
+                      复制
+                    </button>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>
       </div>
 
       {/* 底部工具栏 */}
-      <div style={styles.toolbar}>
-        <button style={styles.toolbarBtn} onClick={() => setIsImportDialogOpen(true)}>
-          <ImportIcon size={13} />
+      <div className="pv-toolbar">
+        <button className="pv-toolbar-btn" onClick={() => setIsImportDialogOpen(true)}>
+          <ImportIcon size={12} />
           导入
         </button>
-        <button style={styles.toolbarBtn} onClick={handleExport}>
-          <ExportIcon size={13} />
+        <button className="pv-toolbar-btn" onClick={handleExport}>
+          <ExportIcon size={12} />
           导出
         </button>
-        <button style={styles.toolbarBtn}>
-          <GistIcon size={13} />
+        <button className="pv-toolbar-btn">
+          <GistIcon size={12} />
           Gist同步
         </button>
-        <span style={styles.spacer} />
-        <span style={styles.statusBar}>
+        <span className="pv-spacer" />
+        <span className="pv-statusbar">
           v0.1.0 · {prompts.length} 条提示词
         </span>
       </div>
