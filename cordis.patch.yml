@@ -1,0 +1,8 @@
+# dsh-invoke 插件挂载补丁
+# 由 DeepSeek Harness 的 cordis loader 读取，将本插件作为一行 entry 挂到根 entry 树。
+# 遵循 cordis-plugin-include 的 patch 语义：`insert`（无 id）将行追加到顶层。
+- insert:
+    - id: dsh-invoke
+      name: dsh-invoke
+      config:
+        enabled: true

@@ -2,13 +2,14 @@
   "name": "dsh-invoke",
   "version": "0.1.0",
   "description": "Prompt Vault & Invoker for DeepSeek Harness — 管理、分类、快速调用提示词，支持侧边栏 GUI",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc --watch",
-    "test": "jest",
-    "lint": "eslint src --ext .ts,.tsx"
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "build:client": "tsc -p tsconfig.client.json",
+    "test": "jest"
   },
   "keywords": [
     "deepseek-harness",
@@ -19,11 +20,33 @@
   ],
   "author": "Melosic",
   "license": "MIT",
-  "peerDependencies": {
-    "@deepseek-ai/dsh": ">=0.1.0 <0.2.0"
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-connection"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-commands": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-home-paths": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6",
+    "js-yaml": "^5.3.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh": "file:vendor/dsh-stub",
+    "@deepseek-ai/dsh-cmdline": "^0.1.0-rc.6",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
@@ -32,11 +55,6 @@
     "jest": "^30.4.2",
     "ts-jest": "^29.4.12",
     "typescript": "^5.0.0"
-  },
-  "dependencies": {
-    "js-yaml": "^5.3.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
