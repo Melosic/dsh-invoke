@@ -1,7 +1,7 @@
 // src/ui/components/ImportDialog.tsx
 
 import React, { useState, useEffect } from 'react';
-import { importFromJSON } from '../../engine/import-export';
+import { importFromJSON, importFromYAML } from '../../engine/import-export';
 import { injectStyles } from '../styles';
 
 interface ImportDialogProps {
@@ -40,7 +40,8 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
     setLoading(true);
     try {
       const text = await file.text();
-      const result = importFromJSON(text, mode);
+      const isYaml = /\.(ya?ml)$/i.test(file.name);
+      const result = isYaml ? importFromYAML(text, mode) : importFromJSON(text, mode);
       setResult({ success: result.success, message: result.message });
       if (result.success) {
         onSuccess();
@@ -68,13 +69,13 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
     <div className="pv-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div className="pv-modal pv-modal-sm" onClick={(e) => e.stopPropagation()}>
         <h2 className="pv-modal-title">导入提示词</h2>
-        <p className="pv-modal-desc">从 JSON 文件导入提示词</p>
+        <p className="pv-modal-desc">从 JSON 或 YAML 文件导入提示词</p>
 
         <div className="pv-field">
           <label className="pv-label">选择文件</label>
           <input
             type="file"
-            accept=".json"
+            accept=".json,.yaml,.yml"
             className="pv-input"
             onChange={handleFileChange}
             style={{ padding: '7px' }}

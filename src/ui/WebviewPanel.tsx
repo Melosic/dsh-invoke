@@ -27,7 +27,7 @@ import {
 } from '../storage/manager';
 import { renderTemplate, extractVariablesFromBody } from '../engine/template';
 import { prepareVariables } from '../engine/variable-resolver';
-import { exportToJSON, downloadJSON } from '../engine/import-export';
+import { exportToJSON, exportToYAML, downloadJSON, downloadYAML } from '../engine/import-export';
 
 // ============ React 组件 ============
 
@@ -197,9 +197,13 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
 
   // ============ 导入导出 ============
 
-  const handleExport = () => {
-    const json = exportToJSON();
-    downloadJSON(json, `prompts-backup-${new Date().toISOString().slice(0, 10)}.json`);
+  const handleExport = (format: 'json' | 'yaml') => {
+    const date = new Date().toISOString().slice(0, 10);
+    if (format === 'yaml') {
+      downloadYAML(exportToYAML(), `prompts-backup-${date}.yaml`);
+    } else {
+      downloadJSON(exportToJSON(), `prompts-backup-${date}.json`);
+    }
     showToast('导出成功');
   };
 
@@ -309,9 +313,13 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
           <ImportIcon size={12} />
           导入
         </button>
-        <button className="pv-toolbar-btn" onClick={handleExport}>
+        <button className="pv-toolbar-btn" onClick={() => handleExport('json')}>
           <ExportIcon size={12} />
           导出
+        </button>
+        <button className="pv-toolbar-btn" onClick={() => handleExport('yaml')}>
+          <ExportIcon size={12} />
+          导出YAML
         </button>
         <button className="pv-toolbar-btn">
           <GistIcon size={12} />

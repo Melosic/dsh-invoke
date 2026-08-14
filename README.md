@@ -16,7 +16,7 @@ dsh-invoke 是 DeepSeek Harness 的社区插件，专注于提示词的管理与
 - **分类树 + 实时搜索**：左侧分类筛选，顶部搜索框实时过滤（标题 / 描述 / 标签 / 正文）
 - **亮 / 暗主题自适应**：跟随 Harness 的 `data-ds-dark-theme` 机制自动切换
 - **双层存储合并**：用户级全局存储 + 项目级存储，项目级优先级更高
-- **导入 / 导出**：JSON 批量导入（合并 / 覆盖两种模式）、导出备份
+- **导入 / 导出**：JSON / YAML 批量导入（合并 / 覆盖两种模式）、导出备份
 - **命令行完整支持**：`/prompt` 系列命令 + 别名系统 `/alias`
 - **使用统计与智能排序**：基于使用频次与最近使用时间的综合得分排序
 
@@ -84,8 +84,8 @@ export default defineConfig({
 | `/prompt category list` | 列出所有分类 |
 | `/prompt category add <name>` | 添加自定义分类 |
 | `/prompt category remove <name>` | 删除自定义分类 |
-| `/prompt export [path]` | 导出提示词库为 JSON 文件 |
-| `/prompt import <path> [merge\|overwrite]` | 从 JSON 文件导入提示词 |
+| `/prompt export [path]` | 导出提示词库为 JSON/YAML 文件（按扩展名识别） |
+| `/prompt import <path> [merge\|overwrite]` | 从 JSON/YAML 文件导入提示词 |
 | `/alias list` | 列出所有别名 |
 | `/alias set <alias> <id>` | 设置短别名（如 `/cr` 调用代码审查） |
 | `/alias remove <alias>` | 删除别名 |
@@ -136,7 +136,7 @@ export default defineConfig({
 业务逻辑层（engine/ + storage/）
 ├── template.ts            # 模板渲染（{{var}} 替换）
 ├── variable-resolver.ts   # 变量提取与解析（含实验性自动提取）
-├── import-export.ts       # JSON 导入导出
+├── import-export.ts       # JSON / YAML 导入导出
 └── manager.ts             # 双层存储合并（user 全局 + user 项目）
         ↓
 Harness API 适配层（adapter/）
@@ -171,7 +171,7 @@ dsh-invoke/
 │   ├── engine/
 │   │   ├── template.ts       # 变量替换（{{var}}）
 │   │   ├── variable-resolver.ts  # 变量提取（含实验性自动提取）
-│   │   └── import-export.ts  # JSON 导入导出
+│   │   └── import-export.ts  # JSON / YAML 导入导出
 │   ├── commands/
 │   │   ├── prompt.ts         # 主命令注册
 │   │   ├── alias.ts          # 别名管理与冲突检测
@@ -204,14 +204,13 @@ npm run lint    # ESLint 检查（待补充）
 | P0 | 复制到剪贴板 + 变量填充 | 已完成 |
 | P0 | 分类树管理 & 实时搜索 | 已完成 |
 | P0 | 亮/暗主题自动适配 | 已完成 |
-| P1 | 导入 / 导出 | 已完成（JSON） |
+| P1 | 导入 / 导出 | 已完成（JSON / YAML） |
 | P1 | 2 列网格卡片布局 | 已完成 |
 | P1 | 变量替换（{{var}}） | 已完成 |
 | P1 | 独立 Webview 图形界面 | 已完成 |
 | P1 | 别名系统（含冲突检测） | 已完成 |
 | P2 | 项目级自动加载与双层合并 | 已完成 |
 | P2 | 使用统计与智能排序 | 已完成 |
-| P1 | YAML 导入导出 | 规划中 |
 | P2 | AI 辅助生成提示词（实验性） | 规划中 |
 | P2 | GitHub Gist 云端同步 | 规划中 |
 

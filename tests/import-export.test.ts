@@ -1,5 +1,11 @@
 // tests/import-export.test.ts
-import { exportToJSON, importFromJSON } from '../src/engine/import-export';
+import yaml from 'js-yaml';
+import {
+  exportToJSON,
+  exportToYAML,
+  importFromJSON,
+  importFromYAML
+} from '../src/engine/import-export';
 import { readStorage, writeStorage, getAllCategories } from '../src/storage/manager';
 import type { Prompt, PromptStorage } from '../src/storage/manager';
 import { mockFs } from './helpers/mockFs';
@@ -95,5 +101,62 @@ describe('importFromJSON', () => {
 
     const storage = readStorage();
     expect(storage.prompts.map(p => p.id)).toEqual(['b']);
+  });
+});
+
+describe('exportToYAML / importFromYAML', () => {
+  beforeEach(() => mockFs.__reset());
+
+  test('导出可解析的 YAML，包含内置示例', () => {
+    const yamlString = exportToYAML();
+    const data = yaml.load(yamlString) as PromptStorage;
+    expect(data.version).toBe(1);
+    expect(Array.isArray(data.prompts)).toBe(true);
+    expect(data.prompts.some(p => p.id === 'code-review')).toBe(true);
+  });
+
+  test('YAML 往返（overwrite）保留多行正文与标签', () => {
+    writeStorage(
+      makeStorage([
+        makePrompt({ id: 'a', title: 'A', body: '多行正文\n{{code}}', tags: ['x', 'y'] })
+      ])
+    );
+    const yamlString = exportToYAML();
+    const result = importFromYAML(yamlString, 'overwrite');
+    expect(result.success).toBe(true);
+
+    const storage = readStorage();
+    const prompt = storage.prompts.find(p => p.id === 'a');
+    expect(prompt?.title).toBe('A');
+    expect(prompt?.body).toBe('多行正文\n{{code}}');
+    expect(prompt?.tags).toEqual(['x', 'y']);
+  });
+
+  test('merge 模式：新增新 ID，跳过重复 ID', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'a', title: 'A' })]));
+    const imported = makeStorage([
+      makePrompt({ id: 'a', title: 'A2' }),
+      makePrompt({ id: 'b', title: 'B' })
+    ]);
+    const result = importFromYAML(yaml.dump(imported), 'merge');
+    expect(result.success).toBe(true);
+    expect(result.added).toBe(1);
+    expect(result.skipped).toBe(1);
+
+    const storage = readStorage();
+    expect(storage.prompts.find(p => p.id === 'a')?.title).toBe('A');
+    expect(storage.prompts.find(p => p.id === 'b')).toBeDefined();
+  });
+
+  test('非法 YAML 返回失败', () => {
+    const result = importFromYAML('not: [valid: yaml', 'merge');
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('导入失败');
+  });
+
+  test('缺少必填字段的 YAML 返回失败', () => {
+    const result = importFromYAML('foo: bar', 'merge');
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('无效的数据格式');
   });
 });

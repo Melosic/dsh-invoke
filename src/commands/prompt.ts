@@ -14,7 +14,7 @@ import {
   removeCustomCategory
 } from '../storage/manager';
 import { renderTemplate, extractVariablesFromBody } from '../engine/template';
-import { exportToJSON, importFromJSON } from '../engine/import-export';
+import { exportToJSON, exportToYAML, importFromJSON, importFromYAML } from '../engine/import-export';
 import { copyToClipboard } from './clipboard';
 import { removeAliasesByPromptId } from './alias';
 import * as fs from 'fs';
@@ -375,13 +375,15 @@ export function registerPromptCommands(ctx: Context) {
 
   // ============ export ============
   promptCmd
-    .subcommand('export [path]', '导出提示词库到 JSON 文件')
+    .subcommand('export [path]', '导出提示词库到文件（按扩展名识别 JSON/YAML）')
     .action(async (args: { path?: string }) => {
-      const json = exportToJSON();
-      const filePath = args.path || `prompts-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const date = new Date().toISOString().slice(0, 10);
+      const filePath = args.path || `prompts-backup-${date}.json`;
+      const isYaml = /\.(ya?ml)$/i.test(filePath);
+      const content = isYaml ? exportToYAML() : exportToJSON();
       try {
-        fs.writeFileSync(filePath, json, 'utf-8');
-        console.log(`✅ 已导出到: ${filePath}`);
+        fs.writeFileSync(filePath, content, 'utf-8');
+        console.log(`✅ 已导出到: ${filePath} (${isYaml ? 'YAML' : 'JSON'})`);
       } catch (error) {
         console.log(`❌ 导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
       }
@@ -389,12 +391,13 @@ export function registerPromptCommands(ctx: Context) {
 
   // ============ import ============
   promptCmd
-    .subcommand('import <path> [mode]', '从 JSON 文件导入提示词')
+    .subcommand('import <path> [mode]', '从 JSON/YAML 文件导入提示词')
     .action(async (args: { path: string; mode?: string }) => {
       const mode = args.mode === 'overwrite' ? 'overwrite' : 'merge';
       try {
         const content = fs.readFileSync(args.path, 'utf-8');
-        const result = importFromJSON(content, mode);
+        const isYaml = /\.(ya?ml)$/i.test(args.path);
+        const result = isYaml ? importFromYAML(content, mode) : importFromJSON(content, mode);
         console.log(`✅ ${result.message}`);
       } catch (error) {
         console.log(`❌ 导入失败: ${error instanceof Error ? error.message : '未知错误'}`);
