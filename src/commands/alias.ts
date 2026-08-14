@@ -1,17 +1,16 @@
 // src/commands/alias.ts
-// 别名管理与冲突检测
-// 职责：
-//   1. 别名的持久化存储（~/.deepseek-harness/aliases.json）
-//   2. 别名冲突检测（与已注册命令、其他别名冲突）
-//   3. 别名的增删改查命令注册
+// 别名管理与 DSH 命令注册
 
-import { Context } from '@deepseek-ai/dsh';
+import { Context } from '@deepseek-ai/cordis';
+import type { CommandResult } from '@deepseek-ai/dsh-commands';
 import * as fs from 'fs';
 import * as path from 'path';
-import os from 'os';
+import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
 import { getPromptById, incrementUsage } from '../storage/manager';
 import { extractVariablesFromBody } from '../engine/template';
-import { copyToClipboard } from './clipboard';
+
+// 导入 @deepseek-ai/dsh-commands 以激活其 declare module 类型增强，
+// 使 ctx.commands 在 Context 上可见（仅类型导入，无运行时副作用）。
 
 // ============ 类型定义 ============
 
@@ -31,7 +30,7 @@ interface AliasStore {
 
 // ============ 存储 ============
 
-const ALIASES_DIR = path.join(os.homedir(), '.deepseek-harness');
+const ALIASES_DIR = dshHomePath();
 const ALIASES_FILE = path.join(ALIASES_DIR, 'aliases.json');
 
 function ensureAliasFile(): void {
@@ -99,8 +98,8 @@ export function addAlias(alias: string, promptId: string): AliasEntry {
     );
   }
 
-  // 冲突检测 2：与内置 prompt 命令冲突
-  const RESERVED = ['prompt', 'help', 'clear', 'exit'];
+  // 冲突检测 2：与内置命令冲突
+  const RESERVED = ['prompt', 'prompt-list', 'alias', 'help', 'clear', 'exit'];
   if (RESERVED.includes(normalized)) {
     throw new Error(`别名「/${normalized}」与系统保留命令冲突，请换一个`);
   }
@@ -144,87 +143,28 @@ export function removeAliasesByPromptId(promptId: string): void {
 // ============ 命令注册 ============
 
 export function registerAliasCommands(ctx: Context): void {
-  const aliasCmd = ctx.command('alias', 'Prompt 短别名管理（键盘流快捷调用）');
-
-  // alias list
-  aliasCmd
-    .subcommand('list', '列出所有别名')
-    .action(async () => {
-      const aliases = getAllAliases();
-      console.log(`\n🔗 所有别名（共 ${aliases.length} 个）：\n`);
-      if (aliases.length === 0) {
-        console.log('  暂无别名，使用 /alias set <别名> <提示词ID> 添加');
-        return;
-      }
-      aliases.forEach(a => {
-        const prompt = getPromptById(a.promptId);
-        const title = prompt ? prompt.title : '（提示词已删除）';
-        console.log(`  /${a.alias} -> ${title} [${a.promptId}]`);
-      });
-      console.log('');
-    });
-
-  // alias set（新增/覆盖）
-  aliasCmd
-    .subcommand('set <alias> <id>', '设置别名：/alias set <别名> <提示词ID>')
-    .action(async (args: { alias: string; id: string }) => {
-      try {
-        const entry = addAlias(args.alias, args.id);
-        console.log(`✅ 已设置别名: /${entry.alias} -> ${getPromptById(entry.promptId)?.title ?? ''}`);
-        console.log(`   现在可以直接输入 /${entry.alias} 快捷调用`);
-      } catch (error) {
-        console.log(`❌ ${error instanceof Error ? error.message : '设置失败'}`);
-      }
-    });
-
-  // alias remove
-  aliasCmd
-    .subcommand('remove <alias>', '删除别名')
-    .action(async (args: { alias: string }) => {
-      const success = removeAlias(args.alias);
-      if (success) {
-        console.log(`✅ 已删除别名: /${args.alias.replace(/^\//, '')}`);
-      } else {
-        console.log(`❌ 未找到别名: /${args.alias.replace(/^\//, '')}`);
-      }
-    });
-
-  // 注册所有已持久化的别名命令
-  registerPersistedAliases(ctx);
-}
-
-/**
- * 注册所有已保存的别名命令
- */
-export function registerPersistedAliases(ctx: Context): void {
-  const aliases = getAllAliases();
-  aliases.forEach(a => {
-    registerAliasCommand(ctx, a);
-  });
-}
-
-/**
- * 注册单个别名命令
- */
-function registerAliasCommand(ctx: Context, entry: AliasEntry): void {
-  const prompt = getPromptById(entry.promptId);
-  if (!prompt) {
-    console.warn(`[dsh-invoke] ⚠️ 别名 /${entry.alias} 指向的提示词已不存在，跳过注册`);
+  if (typeof ctx.commands?.register !== 'function') {
+    console.warn('[dsh-invoke] ⚠️ ctx.commands 不可用，跳过别名命令注册');
     return;
   }
 
-  const aliasCmd = ctx.command(entry.alias, `快捷调用: ${prompt.title}`);
-  aliasCmd.action(async () => {
-    console.log(`📋 调用提示词: ${prompt.title}`);
-    const varNames = extractVariablesFromBody(prompt.body);
-    if (varNames.length === 0) {
-      await copyToClipboard(prompt.body);
-      incrementUsage(prompt.id);
-      console.log('✅ 已复制到剪贴板，请粘贴使用');
-    } else {
-      console.log(`⚠️ 提示词「${prompt.title}」包含变量 (${varNames.join(', ')})，`);
-      console.log(`   请使用 /prompt use ${prompt.id} 交互式填写变量`);
-    }
+  // /alias - 列出所有别名
+  ctx.commands.register({
+    name: 'alias',
+    description: '列出所有已注册的 Prompt 别名',
+    handler: () => {
+      const aliases = getAllAliases();
+      if (aliases.length === 0) {
+        return { kind: 'success' as const, text: '🔗 暂无别名，请通过 UI 面板添加' };
+      }
+      const lines = aliases.map(a => {
+        const prompt = getPromptById(a.promptId);
+        const title = prompt ? prompt.title : '（提示词已删除）';
+        return `  /${a.alias} → ${title}`;
+      });
+      return { kind: 'success' as const, text: `🔗 别名列表（共 ${aliases.length} 个）\n\n${lines.join('\n')}` };
+    },
   });
-}
 
+  console.log('[dsh-invoke] ✅ alias 命令注册完成');
+}

@@ -2,7 +2,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import os from 'os';
+import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
 import {
   initStorageContext,
   getProjectStoragePath,
@@ -73,7 +73,7 @@ function getDefaultStorage(): PromptStorage {
 
 // ============ 文件操作 ============
 
-const STORAGE_DIR = path.join(os.homedir(), '.deepseek-harness');
+const STORAGE_DIR = dshHomePath();
 const STORAGE_FILE = path.join(STORAGE_DIR, 'prompts.user.json');
 
 /**

@@ -145,57 +145,6 @@ export function importFromYAML(
   }
 }
 
-// ============ 文件下载 ============
-
-function downloadFile(data: string, filename: string, mime: string): void {
-  const blob = new Blob([data], { type: mime });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-/**
- * 下载 JSON 文件到本地
- */
-export function downloadJSON(data: string, filename?: string): void {
-  downloadFile(
-    data,
-    filename || `prompts-backup-${new Date().toISOString().slice(0, 10)}.json`,
-    'application/json'
-  );
-}
-
-/**
- * 下载 YAML 文件到本地
- */
-export function downloadYAML(data: string, filename?: string): void {
-  downloadFile(
-    data,
-    filename || `prompts-backup-${new Date().toISOString().slice(0, 10)}.yaml`,
-    'application/yaml'
-  );
-}
-
-/**
- * 从文件读取 JSON
- */
-export function readJSONFromFile(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        resolve(e.target.result as string);
-      } else {
-        reject(new Error('读取文件失败'));
-      }
-    };
-    reader.onerror = () => reject(new Error('读取文件失败'));
-    reader.readAsText(file);
-  });
-}
+// 说明：本模块仅服务 Host 端（Node）。
+// 浏览器端通过 /api/dsh-invoke/import 与 /api/dsh-invoke/export 与 Host 通信，
+// 文件下载 / 读取由 src/ui 组件直接使用 Blob / FileReader 完成，无需在此重复实现。

@@ -20,6 +20,9 @@ import { initStorageContext } from '../src/storage/context';
 import type { Prompt, PromptStorage } from '../src/storage/manager';
 import { mockFs } from './helpers/mockFs';
 
+jest.mock('@deepseek-ai/dsh-home-paths', () => ({
+  dshHomePath: () => '/tmp/dsh-invoke-test'
+}));
 jest.mock('fs', () => require('./helpers/mockFs').mockFs);
 
 function makePrompt(overrides: Partial<Prompt> = {}): Prompt {
