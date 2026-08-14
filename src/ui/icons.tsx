@@ -1,4 +1,4 @@
-// src/ui/icons.ts
+// src/ui/icons.tsx
 
 /**
  * Feather Icons 内联 SVG 组件
@@ -15,9 +15,9 @@ interface IconProps {
 
 const IconBase: React.FC<{
   children: React.ReactNode;
-  size: number;
+  size?: number;
   className?: string;
-  strokeWidth: number;
+  strokeWidth?: number;
 }> = ({ children, size = 18, className = '', strokeWidth = 2 }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

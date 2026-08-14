@@ -17,13 +17,14 @@
     "prompt-vault",
     "ai-agent"
   ],
-  "author": "你的名字",
+  "author": "Melosic",
   "license": "MIT",
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.1.0 <0.2.0"
   },
   "devDependencies": {
     "@deepseek-ai/dsh": "^0.1.0",
+    "@types/node": "^20.0.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "typescript": "^5.0.0"
@@ -36,3 +37,4 @@
     "node": ">=18.0.0"
   }
 }
+
