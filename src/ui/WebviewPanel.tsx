@@ -19,6 +19,7 @@ import { ImportDialog } from './components/ImportDialog';
 import {
   Prompt,
   getAllPrompts,
+  getAllCategories,
   deletePrompt,
   incrementUsage
 } from '../storage/manager';
@@ -250,6 +251,7 @@ const styles = {
 export const WebviewPanel: React.FC = () => {
   const theme = useTheme();
   const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -266,20 +268,23 @@ export const WebviewPanel: React.FC = () => {
 
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
-  // 加载数据
-  useEffect(() => {
-    loadData();
-  }, []);
+  // ============ 加载数据 ============
 
   const loadData = () => {
     setPrompts(getAllPrompts());
+    setCategories(getAllCategories());
   };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleCategoryChange = () => {
     loadData();
   };
 
-  // 过滤逻辑
+  // ============ 过滤逻辑 ============
+
   const filteredPrompts = useMemo(() => {
     let result = prompts;
     if (selectedCategory) {
@@ -577,6 +582,7 @@ export const WebviewPanel: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleModalSuccess}
         editPrompt={editingPrompt}
+        categories={categories}
       />
 
       {/* 变量替换对话框 */}

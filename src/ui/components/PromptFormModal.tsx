@@ -1,20 +1,22 @@
 // src/ui/components/PromptFormModal.tsx
 
 import React, { useState, useEffect } from 'react';
-import { Prompt, Variable, addPrompt, updatePrompt, getAllCategories } from '../../storage/manager';
+import { Prompt, Variable, addPrompt, updatePrompt } from '../../storage/manager';
 
 interface PromptFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  editPrompt?: Prompt | null;  // 有值时为编辑模式，否则为新增模式
+  editPrompt?: Prompt | null;
+  categories: string[];  // 新增：从父组件传入分类列表
 }
 
 export const PromptFormModal: React.FC<PromptFormModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  editPrompt
+  editPrompt,
+  categories  // 接收分类列表
 }) => {
   const isEditMode = !!editPrompt;
 
@@ -28,17 +30,12 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
   const [variables, setVariables] = useState<Variable[]>([
     { name: '', type: 'text', placeholder: '', required: false }
   ]);
-  const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [error, setError] = useState('');
 
   // ============ 加载数据 ============
 
   useEffect(() => {
     if (isOpen) {
-      // 加载分类列表
-      const allCats = getAllCategories();
-      setCustomCategories(allCats);
-
       // 如果是编辑模式，填充表单
       if (editPrompt) {
         setTitle(editPrompt.title);
@@ -53,14 +50,14 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
         // 新增模式，重置表单
         setTitle('');
         setDescription('');
-        setCategory(allCats[0] || '');
+        setCategory(categories.length > 0 ? categories[0] : '');
         setTags('');
         setBody('');
         setVariables([{ name: '', type: 'text', placeholder: '', required: false }]);
         setError('');
       }
     }
-  }, [isOpen, editPrompt]);
+  }, [isOpen, editPrompt, categories]);  // 添加 categories 依赖，分类列表变化时更新
 
   // ============ 变量管理 ============
 
@@ -161,6 +158,11 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
   // ============ 渲染 ============
 
   if (!isOpen) return null;
+
+  // 分类选项：确保当前选中的分类在列表中
+  const categoryOptions = categories.length > 0 ? categories : ['未分类'];
+  // 如果当前选中的分类不在列表中，自动选第一个
+  const safeCategory = categoryOptions.includes(category) ? category : categoryOptions[0];
 
   return (
     <div
@@ -302,7 +304,7 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
             分类 <span style={{ color: '#dc2626' }}>*</span>
           </label>
           <select
-            value={category}
+            value={safeCategory}
             onChange={(e) => setCategory(e.target.value)}
             style={{
               width: '100%',
@@ -315,10 +317,13 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
               outline: 'none'
             }}
           >
-            {customCategories.map(cat => (
+            {categoryOptions.map(cat => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted, #7a7a8a)', marginTop: '4px' }}>
+            💡 可在左侧分类树中新增或重命名分类
+          </div>
         </div>
 
         <div style={{ marginBottom: '14px' }}>

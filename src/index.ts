@@ -5,28 +5,16 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { tryLoadUI, getWorkspaceRoot } from './adapter/harness-api';
 import { WebviewPanel } from './ui/WebviewPanel';
+import { registerPromptCommands } from './commands/prompt';
 
 // ============ 插件导出 ============
 
 export function apply(ctx: Context) {
   console.log('[dsh-invoke] 🚀 正在加载 Prompt Vault 插件...');
 
-  // ============ 1. 注册命令（降级方案） ============
+  // ============ 1. 注册命令 ============
 
-  ctx.command('prompt', 'Prompt Vault 提示词管理')
-    .subcommand('list [分类]', '列出所有提示词')
-    .action(async () => {
-      console.log('[dsh-invoke] 📋 列出提示词（功能开发中）');
-    })
-    .subcommand('add', '添加新提示词')
-    .action(async () => {
-      console.log('[dsh-invoke] ➕ 添加提示词（功能开发中）');
-    })
-    .subcommand('use <id>', '使用指定提示词')
-    .action(async () => {
-      console.log('[dsh-invoke] 📋 使用提示词（功能开发中）');
-    });
-
+  registerPromptCommands(ctx);
   console.log('[dsh-invoke] ✅ 命令注册完成');
 
   // ============ 2. 加载 React UI ============
@@ -34,18 +22,18 @@ export function apply(ctx: Context) {
   const workspaceRoot = getWorkspaceRoot(ctx);
   if (workspaceRoot) {
     console.log(`[dsh-invoke] 📁 工作区路径: ${workspaceRoot}`);
+  } else {
+    console.warn('[dsh-invoke] ⚠️ 无法获取工作区路径，仅加载用户级存储');
   }
 
   // 构建 UI 渲染函数
   const renderUI = () => {
-    // 创建挂载容器
     const container = document.createElement('div');
     container.id = 'dsh-invoke-root';
     container.style.width = '100%';
     container.style.height = '100%';
     container.style.overflow = 'hidden';
 
-    // 使用 React 18 渲染
     const root = createRoot(container);
     root.render(React.createElement(WebviewPanel));
 
