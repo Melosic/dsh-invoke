@@ -1,7 +1,7 @@
 // src/ui/components/PromptFormModal.tsx
 
 import React, { useState, useEffect } from 'react';
-import { Prompt, Variable, addPrompt, updatePrompt } from '../../storage/manager';
+import { Prompt, Variable, addPrompt, updatePrompt } from '../../client/api';
 import { injectStyles } from '../styles';
 
 interface PromptFormModalProps {
@@ -76,7 +76,7 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
     setVariables(newVars);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title.trim()) { setError('请输入标题'); return; }
     if (!description.trim()) { setError('请输入描述'); return; }
     if (!category.trim()) { setError('请选择分类'); return; }
@@ -103,9 +103,9 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
 
     try {
       if (isEditMode) {
-        updatePrompt(id, promptData);
+        await updatePrompt(id, promptData);
       } else {
-        addPrompt(promptData);
+        await addPrompt(promptData);
       }
       onSuccess();
       onClose();
@@ -133,8 +133,9 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
         {error && <div className="pv-error">{error}</div>}
 
         <div className="pv-field">
-          <label className="pv-label">标题<span className="pv-required">*</span></label>
+          <label className="pv-label" htmlFor="pv-f-title">标题<span className="pv-required">*</span></label>
           <input
+            id="pv-f-title"
             type="text"
             className="pv-input"
             value={title}
@@ -144,8 +145,9 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
         </div>
 
         <div className="pv-field">
-          <label className="pv-label">描述<span className="pv-required">*</span></label>
+          <label className="pv-label" htmlFor="pv-f-desc">描述<span className="pv-required">*</span></label>
           <input
+            id="pv-f-desc"
             type="text"
             className="pv-input"
             value={description}
@@ -155,8 +157,9 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
         </div>
 
         <div className="pv-field">
-          <label className="pv-label">分类<span className="pv-required">*</span></label>
+          <label className="pv-label" htmlFor="pv-f-category">分类<span className="pv-required">*</span></label>
           <select
+            id="pv-f-category"
             className="pv-select"
             value={safeCategory}
             onChange={(e) => setCategory(e.target.value)}
@@ -169,8 +172,9 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
         </div>
 
         <div className="pv-field">
-          <label className="pv-label">标签</label>
+          <label className="pv-label" htmlFor="pv-f-tags">标签</label>
           <input
+            id="pv-f-tags"
             type="text"
             className="pv-input"
             value={tags}
@@ -180,8 +184,9 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
         </div>
 
         <div className="pv-field">
-          <label className="pv-label">正文<span className="pv-required">*</span></label>
+          <label className="pv-label" htmlFor="pv-f-body">正文<span className="pv-required">*</span></label>
           <textarea
+            id="pv-f-body"
             className="pv-textarea"
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -192,35 +197,32 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
 
         {/* 变量列表 */}
         <div className="pv-field">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div className="pv-field-head">
             <label className="pv-label" style={{ marginBottom: 0 }}>变量占位符</label>
-            <button className="pv-btn-secondary" style={{ padding: '2px 10px', fontSize: 12 }} onClick={addVariable}>
+            <button className="pv-btn-compact" onClick={addVariable}>
               ＋ 添加变量
             </button>
           </div>
 
           {variables.map((v, index) => (
-            <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 60px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+            <div key={index} className="pv-var-row">
               <input
                 type="text"
                 className="pv-input"
                 value={v.name}
                 onChange={(e) => updateVariable(index, 'name', e.target.value)}
                 placeholder="变量名 (如 code)"
-                style={{ padding: '6px 10px', fontSize: 13 }}
               />
               <select
                 className="pv-select"
                 value={v.type}
                 onChange={(e) => updateVariable(index, 'type', e.target.value)}
-                style={{ padding: '6px 10px', fontSize: 13 }}
               >
                 <option value="text">单行文本</option>
                 <option value="textarea">多行文本</option>
               </select>
               <button
-                className="pv-btn-secondary"
-                style={{ padding: '4px 8px', fontSize: 12, color: 'var(--red-600)' }}
+                className="pv-btn-compact danger"
                 onClick={() => removeVariable(index)}
               >
                 删除

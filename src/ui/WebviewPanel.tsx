@@ -9,43 +9,53 @@ import {
   CopyIcon,
   ImportIcon,
   ExportIcon,
-  GistIcon
+  GistIcon,
+  ChevronDownIcon,
+  InboxIcon,
+  MoonIcon,
+  SunIcon,
+  BookmarkIcon
 } from './icons';
-import { useTheme } from './theme';
+import { useTheme, ThemeMode } from './theme';
 import { injectStyles } from './styles';
 import { PromptFormModal } from './components/PromptFormModal';
 import { CategoryTree } from './components/CategoryTree';
 import { VariableDialog } from './components/VariableDialog';
 import { ImportDialog } from './components/ImportDialog';
+import { ConfirmDialog } from './components/ConfirmDialog';
 import {
   Prompt,
   Variable,
   getAllCategories,
   getSortedPrompts,
   deletePrompt,
-  incrementUsage
-} from '../storage/manager';
+  incrementUsage,
+  exportPrompts
+} from '../client/api';
 import { renderTemplate, extractVariablesFromBody } from '../engine/template';
 import { prepareVariables } from '../engine/variable-resolver';
-import { exportToJSON, exportToYAML, downloadJSON, downloadYAML } from '../engine/import-export';
 
 // ============ React 组件 ============
 
 export interface WebviewPanelProps {
-  /** 可选：获取编辑器当前选中文本的回调（由适配层注入，隔离 Harness API） */
+  /** 预留：可选获取编辑器选中文本的回调（浏览器端暂不注入） */
   getSelectedText?: () => string | null;
 }
 
-export const WebviewPanel: React.FC<WebviewPanelProps> = ({
-  getSelectedText: getSelectedTextProp
-}) => {
-  useTheme(); // 主题通过 CSS 变量 + body[data-ds-dark-theme] 自动适配
+export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: getSelectedTextProp }) => {
+  const theme = useTheme(); // 主题：跟随系统 + 手动覆盖
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null);
+
+  // 导出下拉菜单状态
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+
+  // 卡片展开状态（记录展开的 prompt id 集合）
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // 变量对话框状态
   const [isVarDialogOpen, setIsVarDialogOpen] = useState(false);
@@ -57,6 +67,9 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
   // 导入对话框状态
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
+  // 删除确认对话框状态
+  const [deleteTarget, setDeleteTarget] = useState<Prompt | null>(null);
+
   // 注入样式（幂等）
   useEffect(() => {
     injectStyles();
@@ -64,9 +77,13 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
 
   // ============ 加载数据 ============
 
-  const loadData = () => {
-    setPrompts(getSortedPrompts('smart'));
-    setCategories(getAllCategories());
+  const loadData = async () => {
+    const [sorted, cats] = await Promise.all([
+      getSortedPrompts('smart'),
+      getAllCategories()
+    ]);
+    setPrompts(sorted);
+    setCategories(cats);
   };
 
   useEffect(() => {
@@ -108,11 +125,15 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('确定要删除这个提示词吗？')) {
-      deletePrompt(id);
-      loadData();
-    }
+  const handleDelete = (prompt: Prompt) => {
+    setDeleteTarget(prompt);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    await deletePrompt(deleteTarget.id);
+    setDeleteTarget(null);
+    loadData();
   };
 
   // ============ 复制流程（带变量替换） ============
@@ -197,13 +218,18 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
 
   // ============ 导入导出 ============
 
-  const handleExport = (format: 'json' | 'yaml') => {
+  const handleExport = async (format: 'json' | 'yaml') => {
     const date = new Date().toISOString().slice(0, 10);
-    if (format === 'yaml') {
-      downloadYAML(exportToYAML(), `prompts-backup-${date}.yaml`);
-    } else {
-      downloadJSON(exportToJSON(), `prompts-backup-${date}.json`);
-    }
+    const content = await exportPrompts(format);
+    const blob = new Blob([content], { type: format === 'yaml' ? 'application/yaml' : 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `prompts-backup-${date}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     showToast('导出成功');
   };
 
@@ -212,16 +238,81 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
     showToast('导入成功');
   };
 
+  // ============ 主题切换（仅覆盖插件根容器，不污染全局） ============
+
+  const handleToggleTheme = () => {
+    const root = document.getElementById('dsh-invoke-root');
+    if (!root) return;
+    const next: ThemeMode = theme === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-pv-theme', next);
+  };
+
+  // ============ 搜索高亮 ============
+
+  // 将 query 命中的片段包装为 <mark>，未命中时原样返回文本
+  const highlightText = (text: string, keyPrefix: string): React.ReactNode => {
+    const q = searchQuery.trim();
+    if (!q) return text;
+    const lower = q.toLowerCase();
+    const lowerText = text.toLowerCase();
+    const parts: React.ReactNode[] = [];
+    let cursor = 0;
+    let key = 0;
+    let hit = lowerText.indexOf(lower, cursor);
+    while (hit !== -1) {
+      if (hit > cursor) parts.push(text.slice(cursor, hit));
+      parts.push(
+        <mark key={`${keyPrefix}-${key++}`} className="pv-highlight">
+          {text.slice(hit, hit + q.length)}
+        </mark>
+      );
+      cursor = hit + q.length;
+      hit = lowerText.indexOf(lower, cursor);
+    }
+    if (cursor < text.length) parts.push(text.slice(cursor));
+    return parts.length ? parts : text;
+  };
+
+  // ============ 卡片展开 ============
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // ============ 导出下拉 ============
+
+  const handleExportClick = (format: 'json' | 'yaml') => {
+    setIsExportMenuOpen(false);
+    handleExport(format);
+  };
+
   // ============ 渲染 ============
 
   return (
     <div className="pv-container">
       {/* 顶栏 */}
       <div className="pv-header">
-        <span className="pv-title">Prompt Vault</span>
-        <button className="pv-icon-btn" onClick={handleAdd} title="新增提示词">
-          <PlusIcon size={16} />
-        </button>
+        <span className="pv-title">
+          <BookmarkIcon size={15} className="pv-title-icon" />
+          Prompt Vault
+        </span>
+        <div className="pv-header-actions">
+          <button
+            className="pv-icon-btn"
+            onClick={handleToggleTheme}
+            title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+          >
+            {theme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+          </button>
+          <button className="pv-icon-btn" onClick={handleAdd} title="新增提示词">
+            <PlusIcon size={16} />
+          </button>
+        </div>
       </div>
 
       {/* 主布局 */}
@@ -232,6 +323,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
             onCategoryChange={handleCategoryChange}
+            prompts={prompts}
           />
         </div>
 
@@ -258,13 +350,23 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
           <div className="pv-grid">
             {filteredPrompts.length === 0 ? (
               <div className="pv-empty">
-                {searchQuery || selectedCategory ? '没有匹配的提示词' : '暂无提示词，点击「+」添加第一条'}
+                <div className="pv-empty-icon">
+                  <InboxIcon size={22} />
+                </div>
+                <div className="pv-empty-title">
+                  {searchQuery || selectedCategory ? '没有匹配的提示词' : '暂无提示词'}
+                </div>
+                <div className="pv-empty-desc">
+                  {searchQuery || selectedCategory
+                    ? '换个关键词或分类试试'
+                    : '点击右上角「+」添加第一条提示词'}
+                </div>
               </div>
             ) : (
               filteredPrompts.map(prompt => (
                 <div key={prompt.id} className="pv-card">
                   <div className="pv-card-header">
-                    <span className="pv-card-title">{prompt.title}</span>
+                    <span className="pv-card-title">{highlightText(prompt.title, 't')}</span>
                     <div className="pv-card-actions">
                       <button
                         className="pv-card-action-btn"
@@ -275,14 +377,14 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
                       </button>
                       <button
                         className="pv-card-action-btn danger"
-                        onClick={() => handleDelete(prompt.id)}
+                        onClick={() => handleDelete(prompt)}
                         title="删除"
                       >
                         <DeleteIcon size={13} />
                       </button>
                     </div>
                   </div>
-                  <div className="pv-card-desc">{prompt.description}</div>
+                  <div className="pv-card-desc">{highlightText(prompt.description, 'd')}</div>
                   <div className="pv-card-tags">
                     {prompt.tags.map(tag => (
                       <span key={tag} className="pv-tag">{tag}</span>
@@ -291,6 +393,26 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
                       <span className="pv-tag pv-tag-builtin">示例</span>
                     )}
                   </div>
+
+                  {/* 点击展开正文预览 */}
+                  <span
+                    className="pv-card-expand-hint"
+                    onClick={() => toggleExpand(prompt.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleExpand(prompt.id);
+                      }
+                    }}
+                  >
+                    {expandedIds.has(prompt.id) ? '收起正文 ▾' : '展开正文 ▸'}
+                  </span>
+                  {expandedIds.has(prompt.id) && (
+                    <div className="pv-card-body">{prompt.body}</div>
+                  )}
+
                   <div className="pv-card-footer">
                     <button
                       className="pv-btn-primary"
@@ -313,15 +435,33 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
           <ImportIcon size={12} />
           导入
         </button>
-        <button className="pv-toolbar-btn" onClick={() => handleExport('json')}>
-          <ExportIcon size={12} />
-          导出
-        </button>
-        <button className="pv-toolbar-btn" onClick={() => handleExport('yaml')}>
-          <ExportIcon size={12} />
-          导出YAML
-        </button>
-        <button className="pv-toolbar-btn">
+
+        {/* 导出下拉 */}
+        <div className="pv-dropdown">
+          <button
+            className="pv-toolbar-btn"
+            onClick={() => setIsExportMenuOpen(v => !v)}
+          >
+            <ExportIcon size={12} />
+            导出
+            <ChevronDownIcon size={12} />
+          </button>
+          {isExportMenuOpen && (
+            <>
+              <div className="pv-context-mask" onClick={() => setIsExportMenuOpen(false)} />
+              <div className="pv-dropdown-menu">
+                <button className="pv-dropdown-item" onClick={() => handleExportClick('json')}>
+                  导出 JSON
+                </button>
+                <button className="pv-dropdown-item" onClick={() => handleExportClick('yaml')}>
+                  导出 YAML
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <button className="pv-toolbar-btn" disabled title="Gist 同步规划中，敬请期待">
           <GistIcon size={12} />
           Gist同步
         </button>
@@ -364,6 +504,18 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({
         isOpen={isImportDialogOpen}
         onClose={() => setIsImportDialogOpen(false)}
         onSuccess={handleImportSuccess}
+      />
+
+      {/* 删除确认对话框 */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="删除提示词"
+        message={deleteTarget ? `确定要删除「${deleteTarget.title}」吗？此操作不可撤销。` : ''}
+        confirmText="删除"
+        cancelText="取消"
+        danger
+        onConfirm={confirmDelete}
+        onClose={() => setDeleteTarget(null)}
       />
     </div>
   );

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Variable } from '../../storage/manager';
-import { CopyIcon } from '../icons';
+import { CopyIcon, CheckIcon, InfoIcon } from '../icons';
 import { injectStyles } from '../styles';
 
 interface VariableDialogProps {
@@ -86,7 +86,7 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
 
         {hasExtractMessage && (
           <div className={`pv-extract ${hasAutoExtract ? 'success' : 'info'}`}>
-            <span>{hasAutoExtract ? '✓' : 'ℹ'}</span>
+            {hasAutoExtract ? <CheckIcon size={14} /> : <InfoIcon size={14} />}
             <span>{extractMessage}</span>
           </div>
         )}
@@ -96,12 +96,13 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
           const hasError = !!errors[v.name];
           return (
             <div key={v.name} className="pv-field">
-              <label className="pv-label">
+              <label className="pv-label" htmlFor={`pv-var-${v.name}`}>
                 {v.name}
                 {v.required && <span className="pv-required">*</span>}
               </label>
               {isTextarea ? (
                 <textarea
+                  id={`pv-var-${v.name}`}
                   className="pv-textarea"
                   value={values[v.name] || ''}
                   onChange={(e) => handleChange(v.name, e.target.value)}
@@ -111,6 +112,7 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
                 />
               ) : (
                 <input
+                  id={`pv-var-${v.name}`}
                   type="text"
                   className="pv-input"
                   value={values[v.name] || ''}

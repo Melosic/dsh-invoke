@@ -70,11 +70,30 @@ export const CopyIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
-export const MenuIcon: React.FC<IconProps> = (props) => (
+export const CheckIcon: React.FC<IconProps> = (props) => (
   <IconBase {...props}>
-    <circle cx="12" cy="12" r="1" />
-    <circle cx="19" cy="12" r="1" />
-    <circle cx="5" cy="12" r="1" />
+    <polyline points="20 6 9 17 4 12" />
+  </IconBase>
+);
+
+export const InfoIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="16" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12.01" y2="8" />
+  </IconBase>
+);
+
+export const InboxIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+    <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+  </IconBase>
+);
+
+export const ChevronDownIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <polyline points="6 9 12 15 18 9" />
   </IconBase>
 );
 
@@ -103,6 +122,12 @@ export const ImportIcon: React.FC<IconProps> = (props) => (
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <polyline points="17 8 12 3 7 8" />
     <line x1="12" y1="3" x2="12" y2="15" />
+  </IconBase>
+);
+
+export const BookmarkIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
   </IconBase>
 );
 

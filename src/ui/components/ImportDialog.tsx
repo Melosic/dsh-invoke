@@ -1,7 +1,7 @@
 // src/ui/components/ImportDialog.tsx
 
 import React, { useState, useEffect } from 'react';
-import { importFromJSON, importFromYAML } from '../../engine/import-export';
+import { importPrompts } from '../../client/api';
 import { injectStyles } from '../styles';
 
 interface ImportDialogProps {
@@ -19,6 +19,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     injectStyles();
@@ -28,12 +29,13 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
     if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
       setResult(null);
+      setError('');
     }
   };
 
   const handleImport = async () => {
     if (!file) {
-      alert('请选择文件');
+      setError('请先选择文件');
       return;
     }
 
@@ -41,7 +43,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
     try {
       const text = await file.text();
       const isYaml = /\.(ya?ml)$/i.test(file.name);
-      const result = isYaml ? importFromYAML(text, mode) : importFromJSON(text, mode);
+      const result = await importPrompts(text, isYaml ? 'yaml' : 'json', mode);
       setResult({ success: result.success, message: result.message });
       if (result.success) {
         onSuccess();
@@ -60,6 +62,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
     setFile(null);
     setResult(null);
     setLoading(false);
+    setError('');
     onClose();
   };
 
@@ -78,7 +81,6 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
             accept=".json,.yaml,.yml"
             className="pv-input"
             onChange={handleFileChange}
-            style={{ padding: '7px' }}
           />
           {file && (
             <div className="pv-hint">已选择: {file.name}</div>
@@ -87,8 +89,8 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
 
         <div className="pv-field">
           <label className="pv-label">导入模式</label>
-          <div style={{ display: 'flex', gap: 16 }}>
-            <label style={{ fontSize: 13, cursor: 'pointer', color: 'var(--pv-text-secondary)', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div className="pv-radio-group">
+            <label className="pv-radio">
               <input
                 type="radio"
                 value="merge"
@@ -97,7 +99,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
               />
               合并（跳过重复）
             </label>
-            <label style={{ fontSize: 13, cursor: 'pointer', color: 'var(--pv-text-secondary)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <label className="pv-radio">
               <input
                 type="radio"
                 value="overwrite"
@@ -113,6 +115,10 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
               : '用导入的数据完全替换当前所有提示词'}
           </div>
         </div>
+
+        {error && (
+          <div className="pv-error">{error}</div>
+        )}
 
         {result && (
           <div className={result.success ? 'pv-extract success' : 'pv-error'}>
