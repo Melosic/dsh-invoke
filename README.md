@@ -1,33 +1,35 @@
 # dsh-invoke
 
+**English** | [中文](README.zh.md)
+
 Prompt Vault & Invoker for DeepSeek Harness
 
-提示词管理与快速调用插件 —— 一键召唤你的神级提示词。
+A DeepSeek Harness community plugin for managing and invoking prompts — summon your best prompts with one click.
 
-dsh-invoke 是 DeepSeek Harness 的社区插件，专注于提示词的管理与调用。它内置一条示例提示词作为参考模板，并允许你自由添加、编辑、删除、查看、搜索和分类管理自己的提示词。
+dsh-invoke focuses on prompt management and invocation. It ships with one built-in example prompt as a reference template, and lets you freely add, edit, delete, view, search, and categorize your own prompts.
 
-插件以 **Host + Client 双端结构**运行：Host 端（Node）注册 HTTP 路由与 DSH 命令，Client 端（浏览器）在 Harness 侧边栏注入入口并挂载 React 面板，两者通过同源 `/api/dsh-invoke/*` 通信。
+The plugin runs as a **Host + Client two-part plugin**: the Host side (Node) registers HTTP routes and DSH commands; the Client side (browser) injects a sidebar entry into Harness and mounts a React panel. The two communicate over the same-origin `/api/dsh-invoke/*`.
 
-## 特性
+## Features
 
-- **侧边栏 GUI 优先**：新增 / 编辑 / 删除 / 查看 / 搜索 / 分类管理，全部可视化完成
-- **快速调用（复制到剪贴板）**：点击「复制」→ 填充变量 → 复制 → 手动粘贴发送，不依赖 Harness 内部 DOM，100% 兼容
-- **变量替换**：支持 Mustache 风格占位符 `{{var}}`，调用时弹出对话框交互式填充，并支持从编辑器选区自动提取变量（实验性）
-- **分类树 + 实时搜索**：左侧分类筛选，顶部搜索框实时过滤（标题 / 描述 / 标签 / 正文），命中关键词高亮
-- **亮 / 暗主题自适应**：跟随 Harness 的 `data-ds-dark-theme` 机制自动切换，支持面板内手动覆盖
-- **双层存储合并**：用户级全局存储 + 项目级存储，项目级优先级更高
-- **导入 / 导出**：JSON / YAML 批量导入（合并 / 覆盖两种模式）、导出备份
-- **命令行完整支持**：`/prompt`、`/prompt-list`、`/alias` 命令
-- **使用统计与智能排序**：基于使用频次与最近使用时间的综合得分排序
+- **Sidebar GUI first**: add / edit / delete / view / search / category management, all visual.
+- **Quick invoke (copy to clipboard)**: click "Copy" → fill variables → copy → paste and send. Independent of Harness's internal DOM, 100% compatible.
+- **Variable substitution**: Mustache-style `{{var}}` placeholders, filled interactively via a dialog on invoke, with experimental auto-extraction from the editor selection.
+- **Category tree + live search**: left-hand category filter, top search box with real-time filtering (title / description / tags / body), with matched-keyword highlighting.
+- **Light / dark theme**: follows Harness's `data-ds-dark-theme` mechanism automatically, with in-panel manual override.
+- **Two-layer storage merge**: user-level global storage + project-level storage, project-level wins.
+- **Import / export**: batch JSON / YAML import (merge / overwrite modes), export backup.
+- **Full command-line support**: `/prompt`, `/prompt-list`, `/alias` commands.
+- **Usage stats & smart sorting**: ranked by a composite score of usage frequency and recency.
 
-## 环境要求
+## Requirements
 
 - Node.js >= 18.x
-- DeepSeek Harness >= 0.1.0，< 0.2.0
+- DeepSeek Harness >= 0.1.0, < 0.2.0
 
-## 安装
+## Installation
 
-本插件作为 Cordis 插件挂载。将 `cordis.patch.yml` 交给 Harness 的 cordis loader 读取，或将其内容并入你的 patch 配置：
+The plugin mounts as a Cordis plugin. Give `cordis.patch.yml` to Harness's Cordis loader, or merge its content into your patch config:
 
 ```yaml
 - insert:
@@ -37,55 +39,55 @@ dsh-invoke 是 DeepSeek Harness 的社区插件，专注于提示词的管理与
         enabled: true
 ```
 
-安装依赖：
+Install dependencies:
 
 ```bash
 npm install dsh-invoke
-# 或
+# or
 pnpm add dsh-invoke
 ```
 
-## 快速上手
+## Quick Start
 
-1. 启动 Harness，侧边栏自动注入「Prompt Vault」入口按钮。
-2. 点击入口打开面板。浏览提示词：点击分类筛选，或使用搜索框快速定位。
-3. 使用提示词：点击卡片上的「复制」→ 填写变量 → 点击「复制到剪贴板」→ 粘贴到输入框发送。
-4. 管理提示词：点击「新增」添加自定义提示词，点击卡片上的「编辑」或「删除」管理已有提示词。
+1. Start Harness; the "Prompt Vault" entry button is injected into the sidebar automatically.
+2. Click the entry to open the panel. Browse prompts by clicking a category, or use the search box to locate one quickly.
+3. Use a prompt: click "Copy" on a card → fill variables → click "Copy to clipboard" → paste it into the input and send.
+4. Manage prompts: click "Add" to create a custom prompt, or use "Edit" / "Delete" on cards.
 
-### 内置示例提示词
+### Built-in Example Prompt
 
-插件内置一条示例提示词，可直接使用或作为模板：
+The plugin ships with one example prompt, usable directly or as a template:
 
-| 字段 | 内容 |
+| Field | Value |
 | --- | --- |
 | ID | `code-review` |
-| 标题 | 代码审查 |
-| 描述 | 审查代码中的潜在问题，包括逻辑错误、安全漏洞、性能问题 |
-| 分类 | 开发 |
-| 标签 | `review` `quality` `security` |
-| 正文 | 请审查以下代码，重点关注逻辑错误、安全漏洞、性能问题（含 `{{code}}` 变量） |
-| 变量 | `code`（文本输入，必填） |
+| Title | 代码审查 (Code Review) |
+| Description | 审查代码中的潜在问题，包括逻辑错误、安全漏洞、性能问题 |
+| Category | 开发 (Development) |
+| Tags | `review` `quality` `security` |
+| Body | 请审查以下代码，重点关注逻辑错误、安全漏洞、性能问题（含 `{{code}}` 变量） |
+| Variable | `code` (text input, required) |
 
-## 命令行使用（可选）
+## Command-Line Usage (Optional)
 
-大多数操作可通过侧边栏完成；命令行面向键盘流用户与降级场景。当前命令：
+Most operations can be done via the sidebar; the command line targets keyboard-driven users and fallback scenarios. Current commands:
 
-| 命令 | 说明 |
+| Command | Description |
 | --- | --- |
-| `/prompt` | 列出所有提示词（含分类、内置标记、描述） |
-| `/prompt-list` | 按分类分组列出所有提示词 |
-| `/alias` | 列出所有已注册别名及其指向的提示词 |
+| `/prompt` | List all prompts (with category, built-in marker, description) |
+| `/prompt-list` | List all prompts grouped by category |
+| `/alias` | List all registered aliases and the prompts they point to |
 
-## 数据存储
+## Data Storage
 
-- **用户级（可写）**：`~/.dsh/prompts.user.json`（由 `@deepseek-ai/dsh-home-paths` 解析）
-- **项目级（可写，优先级高）**：`.harness/prompts.json`（当前打开工作区根目录下）
+- **User-level (writable)**: `~/.dsh/prompts.user.json` (resolved via `@deepseek-ai/dsh-home-paths`)
+- **Project-level (writable, higher priority)**: `.harness/prompts.json` (under the currently open workspace root)
 
-### 合并策略
+### Merge Strategy
 
-项目级配置优先级高于用户级，相同 ID 的提示词以项目级为准。若未打开工作区，则仅加载用户级存储。
+Project-level config takes priority over user-level; for a duplicate ID, the project-level prompt wins. When no workspace is open, only user-level storage is loaded.
 
-存储格式示例：
+Example storage format:
 
 ```json
 {
@@ -110,126 +112,126 @@ pnpm add dsh-invoke
 }
 ```
 
-## 技术架构
+## Technical Architecture
 
-插件采用 **Host + Client 双端**结构，符合 DeepSeek Harness 社区插件规范：
+The plugin uses a **Host + Client** two-part structure, following DeepSeek Harness community plugin conventions:
 
 ```
              DeepSeek Harness
         ┌────────────────────┐
-        │  Host 端（Node）    │
+        │  Host side (Node)  │
         │  src/index.ts       │
         │   ├─ host/routes.ts │◄── HTTP /api/dsh-invoke/*
-        │   ├─ commands/*     │◄── DSH 命令 /prompt /alias
-        │   ├─ storage/*      │── 双层存储合并
-        │   └─ engine/*       │── 模板 / 导入导出
+        │   ├─ commands/*     │◄── DSH commands /prompt /alias
+        │   ├─ storage/*      │── two-layer storage merge
+        │   └─ engine/*       │── templates / import-export
         └────────┬───────────┘
-                 │ 同源 fetch
+                 │ same-origin fetch
         ┌────────┴───────────┐
-        │  Client 端（浏览器）│
-        │  src/client/index.ts│── 侧边栏按钮注入 + 面板挂载
-        │  src/client/api.ts │── fetch 封装
-        │  src/ui/*          │── React 面板（深浅主题）
+        │  Client (browser)  │
+        │  src/client/index.ts│── sidebar injection + panel mount
+        │  src/client/api.ts │── fetch wrapper
+        │  src/ui/*          │── React panel (light/dark)
         └────────────────────┘
 ```
 
-### 源码结构
+### Source Layout
 
 ```
 dsh-invoke/
 ├── package.json
-├── cordis.patch.yml        # 插件挂载补丁
-├── tsconfig.json           # Host 端编译
-├── tsconfig.client.json    # Client 端编译
+├── cordis.patch.yml        # plugin mount patch
+├── tsconfig.json           # Host build
+├── tsconfig.client.json    # Client build
 ├── src/
-│   ├── index.ts            # Host 端插件入口
+│   ├── index.ts            # Host plugin entry
 │   ├── host/
-│   │   └── routes.ts       # HTTP 路由层（CRUD API）
+│   │   └── routes.ts       # HTTP route layer (CRUD API)
 │   ├── client/
-│   │   ├── index.ts        # 浏览器入口（侧边栏注入 + 挂载）
-│   │   └── api.ts          # fetch API 封装
+│   │   ├── index.ts        # Browser entry (sidebar injection + mount)
+│   │   └── api.ts          # fetch API wrapper
 │   ├── storage/
-│   │   ├── context.ts      # 存储上下文（工作区/路径配置）
-│   │   └── manager.ts      # 双层合并 + CRUD + 智能排序
+│   │   ├── context.ts      # storage context (workspace/path config)
+│   │   └── manager.ts      # two-layer merge + CRUD + smart sorting
 │   ├── engine/
-│   │   ├── template.ts     # 变量替换（{{var}}）
-│   │   ├── variable-resolver.ts  # 变量提取（含实验性自动提取）
-│   │   └── import-export.ts  # JSON / YAML 导入导出
+│   │   ├── template.ts     # variable substitution ({{var}})
+│   │   ├── variable-resolver.ts  # variable extraction (experimental)
+│   │   └── import-export.ts  # JSON / YAML import-export
 │   ├── commands/
-│   │   ├── prompt.ts       # 主命令注册
-│   │   ├── alias.ts        # 别名管理与冲突检测
-│   │   └── clipboard.ts    # 跨平台剪贴板复制（Node child_process）
+│   │   ├── prompt.ts       # main command registration
+│   │   ├── alias.ts        # alias management & conflict detection
+│   │   └── clipboard.ts    # cross-platform clipboard copy (Node child_process)
 │   └── ui/
-│       ├── theme.ts        # 主题适配（亮/暗色）
-│       ├── icons.tsx       # Feather Icons 内联 SVG
-│       ├── styles.ts       # 设计系统（CSS 变量）
-│       ├── WebviewPanel.tsx  # 主面板（React 18）
-│       └── components/     # 卡片、表单、分类树、变量/导入对话框
-└── tests/                  # Jest 单元测试
+│       ├── theme.ts        # theme adaptation (light/dark)
+│       ├── icons.tsx       # Feather Icons inline SVG
+│       ├── styles.ts       # design system (CSS variables)
+│       ├── WebviewPanel.tsx  # main panel (React 18)
+│       └── components/     # cards, forms, category tree, variable/import dialogs
+└── tests/                  # Jest unit tests
 ```
 
-## 开发
+## Development
 
 ```bash
 npm install
-npm run build          # Host 端编译（tsc -p tsconfig.json）
-npm run build:client   # Client 端编译（tsc -p tsconfig.client.json）
-npm run test           # 运行 Jest 单元测试
+npm run build          # Host build (tsc -p tsconfig.json)
+npm run build:client   # Client build (tsc -p tsconfig.client.json)
+npm run test           # run Jest unit tests
 ```
 
-## 路线图
+## Roadmap
 
-| 优先级 | 功能模块 | 状态 |
+| Priority | Module | Status |
 | --- | --- | --- |
-| P0 | 核心 CRUD（增删改查） | 已完成 |
-| P0 | 复制到剪贴板 + 变量填充 | 已完成 |
-| P0 | 分类树管理 & 实时搜索 | 已完成 |
-| P0 | 亮/暗主题自动适配 | 已完成 |
-| P1 | 导入 / 导出 | 已完成（JSON / YAML） |
-| P1 | 2 列网格卡片布局 | 已完成 |
-| P1 | 变量替换（{{var}}） | 已完成 |
-| P1 | 侧边栏 GUI（Host + Client） | 已完成 |
-| P1 | 别名系统（含冲突检测） | 已完成 |
-| P2 | 项目级自动加载与双层合并 | 已完成 |
-| P2 | 使用统计与智能排序 | 已完成 |
-| P2 | AI 辅助生成提示词（实验性） | 规划中 |
-| P2 | GitHub Gist 云端同步 | 规划中 |
+| P0 | Core CRUD (add/edit/delete/query) | Done |
+| P0 | Copy to clipboard + variable fill | Done |
+| P0 | Category tree management & live search | Done |
+| P0 | Light/dark theme auto-adaptation | Done |
+| P1 | Import / export | Done (JSON / YAML) |
+| P1 | 2-column grid card layout | Done |
+| P1 | Variable substitution ({{var}}) | Done |
+| P1 | Sidebar GUI (Host + Client) | Done |
+| P1 | Alias system (with conflict detection) | Done |
+| P2 | Project-level auto-load & two-layer merge | Done |
+| P2 | Usage stats & smart sorting | Done |
+| P2 | AI-assisted prompt generation (experimental) | Planned |
+| P2 | GitHub Gist cloud sync | Planned |
 
-## 常见问题（FAQ）
+## FAQ
 
-**Q：复制到剪贴板后，能不能自动粘贴到输入框？**
+**Q: After copying to the clipboard, can it auto-paste into the input box?**
 
-A：当前版本为保证稳定性采用手动粘贴。待 Harness 官方开放输入框写入 API 后，会第一时间支持。
+A: The current version uses manual paste for stability. Once Harness officially exposes an input-write API, we will support it right away.
 
-**Q：内置的示例提示词可以删除吗？**
+**Q: Can the built-in example prompt be deleted?**
 
-A：可以。示例提示词与用户自定义提示词一样，支持编辑和删除。
+A: Yes. The example prompt supports edit and delete just like user-defined prompts.
 
-**Q：项目级和用户级同时存在时，以哪个为准？**
+**Q: If both project-level and user-level exist, which wins?**
 
-A：项目级优先级更高，相同 ID 的提示词以项目级配置为准。
+A: Project-level takes priority; for a duplicate ID, the project-level config wins.
 
-**Q：自动变量提取怎么用？为什么有时不生效？**
+**Q: How do I use auto variable extraction? Why does it sometimes not work?**
 
-A：自动提取是实验性功能。使用前需在 Harness 编辑器中选中代码，然后点击「复制」。若当前版本不支持编辑器选区 API，或未选中代码，对话框会提示手动输入。
+A: Auto-extraction is experimental. Select code in the Harness editor first, then click "Copy". If the current version doesn't support the editor selection API, or no code is selected, the dialog will prompt for manual input.
 
-**Q：一定要用命令行吗？**
+**Q: Do I have to use the command line?**
 
-A：不需要。所有操作均可通过侧边栏图形界面完成，命令行仅为键盘流用户和降级场景提供的可选方案。
+A: No. All operations can be done through the sidebar GUI; the command line is an optional fallback for keyboard-driven users and degraded scenarios.
 
-## 版本兼容性
+## Version Compatibility
 
-本插件 v0.1.x 系列兼容 DeepSeek Harness >=0.1.0 <0.2.0。后续 Harness 发布主版本更新时，我们会及时跟进适配，请关注 GitHub Releases。
+The v0.1.x series is compatible with DeepSeek Harness >=0.1.0 <0.2.0. When Harness ships a major update, we will adapt promptly — follow the GitHub Releases page.
 
-## 贡献
+## Contributing
 
-欢迎提交 Issue 和 PR：
+Issues and PRs are welcome:
 
-1. Fork 本项目
-2. 创建特性分支：`git checkout -b feature/amazing-feature`
-3. 提交更改：`git commit -m 'feat: add amazing feature'`（遵循 Conventional Commits）
-4. 推送分支：`git push origin feature/amazing-feature`
-5. 提交 Pull Request
+1. Fork this repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'feat: add amazing feature'` (follow Conventional Commits)
+4. Push the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
 ## License
 
