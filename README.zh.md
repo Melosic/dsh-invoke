@@ -47,6 +47,61 @@ npm install dsh-invoke
 pnpm add dsh-invoke
 ```
 
+## 本地开发 / 从源码安装
+
+如果你要在本地开发本插件，或未经 npm 发布即可运行：
+
+1. **全局安装 DeepSeek Harness**：
+   ```bash
+   npm install -g @deepseek-ai/dsh
+   ```
+
+2. **克隆仓库并安装依赖**：
+   ```bash
+   git clone https://github.com/Melosic/dsh-invoke.git
+   cd dsh-invoke
+   npm install
+   ```
+
+3. **构建插件**：
+   ```bash
+   npm run build          # Host 端编译（tsc -p tsconfig.json）
+   npm run build:client   # Client 端编译（tsdown / esbuild）
+   ```
+
+4. **创建 DSH profile**（已存在可跳过）：
+   ```bash
+   dsh --profile web --help   # 首次运行会生成 ~/.dsh/profiles/web/
+   ```
+
+5. **将插件 link 进 profile**：
+   编辑 `~/.dsh/profiles/web/package.json`，将 `dsh-invoke` 加入 dependencies：
+   ```json
+   "dependencies": {
+     "dsh-invoke": "link:/绝对路径/dsh-invoke"
+   }
+   ```
+   然后安装 profile 依赖：
+   ```bash
+   dsh plugin --profile web install
+   ```
+
+6. **在 `~/.dsh/profiles/web/cordis.patch.yml` 添加插件挂载项**：
+   ```yaml
+   - insert:
+       - id: dsh-invoke
+         name: dsh-invoke
+         config:
+           enabled: true
+   ```
+
+7. **启动 Harness（加载插件）**：
+   ```bash
+   dsh --profile web --port 8080
+   ```
+
+浏览器打开 `http://127.0.0.1:8080/`，侧边栏会自动出现「Prompt Vault」入口按钮。
+
 ## 快速上手
 
 1. 启动 Harness，侧边栏自动注入「Prompt Vault」入口按钮。

@@ -47,6 +47,61 @@ npm install dsh-invoke
 pnpm add dsh-invoke
 ```
 
+## Local Development / From Source
+
+If you want to develop the plugin locally or run it without publishing to npm:
+
+1. **Install DeepSeek Harness globally**:
+   ```bash
+   npm install -g @deepseek-ai/dsh
+   ```
+
+2. **Clone the repository and install dependencies**:
+   ```bash
+   git clone https://github.com/Melosic/dsh-invoke.git
+   cd dsh-invoke
+   npm install
+   ```
+
+3. **Build the plugin**:
+   ```bash
+   npm run build          # Host build (tsc -p tsconfig.json)
+   npm run build:client   # Client build (tsdown / esbuild)
+   ```
+
+4. **Create a DSH profile** (skip if you already have one):
+   ```bash
+   dsh --profile web --help   # creates ~/.dsh/profiles/web/ on first run
+   ```
+
+5. **Link the plugin into the profile**:
+   Edit `~/.dsh/profiles/web/package.json` and add `dsh-invoke` to dependencies:
+   ```json
+   "dependencies": {
+     "dsh-invoke": "link:/absolute/path/to/dsh-invoke"
+   }
+   ```
+   Then install the profile dependencies:
+   ```bash
+   dsh plugin --profile web install
+   ```
+
+6. **Add the plugin mount entry** to `~/.dsh/profiles/web/cordis.patch.yml`:
+   ```yaml
+   - insert:
+       - id: dsh-invoke
+         name: dsh-invoke
+         config:
+           enabled: true
+   ```
+
+7. **Start Harness with the plugin**:
+   ```bash
+   dsh --profile web --port 8080
+   ```
+
+Open `http://127.0.0.1:8080/` in your browser. The **Prompt Vault** entry button should appear in the sidebar automatically.
+
 ## Quick Start
 
 1. Start Harness; the "Prompt Vault" entry button is injected into the sidebar automatically.
