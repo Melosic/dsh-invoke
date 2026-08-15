@@ -4,6 +4,7 @@
 import { Context } from '@deepseek-ai/cordis';
 import type { CommandResult, CommandInvocation } from '@deepseek-ai/dsh-commands';
 import { getSortedPrompts, getAllPrompts } from '../storage/manager.js';
+import { ht } from '../shared/host-messages.js';
 
 // 导入 @deepseek-ai/dsh-commands 以激活其 declare module 类型增强，
 // 使 ctx.commands 在 Context 上可见（仅类型导入，无运行时副作用）。
@@ -25,13 +26,19 @@ export function registerPromptCommands(ctx: Context): void {
   // /prompt - 列出所有提示词
   ctx.commands.register({
     name: 'prompt',
-    description: 'Prompt Vault 提示词管理 — 列出所有提示词',
+    description: ht('cmd.prompt.desc'),
     handler: (invocation) => {
       const prompts = getSortedPrompts('smart', cwdOf(invocation));
       const lines = prompts.map((p, i) =>
-        `${i + 1}. ${p.title} [${p.category}]${p.builtin ? ' (内置)' : ''} — ${p.description}`
+        ht('cmd.prompt.line', {
+          i: i + 1,
+          title: p.title,
+          category: p.category,
+          builtin: p.builtin ? ht('cmd.prompt.builtin') : '',
+          description: p.description,
+        })
       );
-      const text = `📋 Prompt Vault（共 ${prompts.length} 条）\n\n${lines.join('\n') || '  暂无提示词'}`;
+      const text = `${ht('cmd.prompt.header', { count: prompts.length })}\n\n${lines.join('\n') || ht('cmd.prompt.empty')}`;
       return { kind: 'success' as const, text };
     },
   });
@@ -39,18 +46,18 @@ export function registerPromptCommands(ctx: Context): void {
   // /prompt-list - 按分类列出
   ctx.commands.register({
     name: 'prompt-list',
-    description: '列出所有提示词，按分类分组',
+    description: ht('cmd.promptList.desc'),
     handler: (invocation) => {
       const prompts = getAllPrompts(cwdOf(invocation));
       const groups: Record<string, typeof prompts> = {};
       prompts.forEach(p => {
-        const cat = p.category || '未分类';
+        const cat = p.category || ht('cmd.promptList.uncategorized');
         (groups[cat] ??= []).push(p);
       });
       const lines = Object.entries(groups).map(([cat, items]) =>
-        `📂 ${cat}（${items.length} 条）:\n${items.map((p, i) => `  ${i + 1}. ${p.title}${p.builtin ? ' 📌' : ''}`).join('\n')}`
+        `${ht('cmd.promptList.group', { category: cat, count: items.length })}:\n${items.map((p, i) => ht('cmd.promptList.item', { i: i + 1, title: p.title, builtin: p.builtin ? ht('cmd.promptList.builtin') : '' })).join('\n')}`
       );
-      return { kind: 'success' as const, text: `📋 Prompt Vault 分类视图\n\n${lines.join('\n\n')}` };
+      return { kind: 'success' as const, text: `${ht('cmd.promptList.header')}\n\n${lines.join('\n\n')}` };
     },
   });
 

@@ -16,6 +16,8 @@ export interface AliasEntry {
   alias: string;
   /** 关联的提示词 ID */
   promptId: string;
+  /** 创建别名时提示词所在的工作目录（项目级存储定位用；旧数据可能缺失） */
+  promptCwd?: string;
   /** 创建时间 */
   createdAt: string;
 }
@@ -113,9 +115,10 @@ export function validateAliasName(alias: string): string | null {
 
 /**
  * 添加别名（调用方需自行校验 promptId 存在）
+ * @param promptCwd 创建时解析到该提示词的工作目录（跨工作区调用时用于回定位）
  * @throws Error 当别名格式非法或冲突时
  */
-export function addAlias(alias: string, promptId: string): AliasEntry {
+export function addAlias(alias: string, promptId: string, promptCwd?: string): AliasEntry {
   const error = validateAliasName(alias);
   if (error) throw new Error(error);
 
@@ -123,6 +126,7 @@ export function addAlias(alias: string, promptId: string): AliasEntry {
   const entry: AliasEntry = {
     alias: normalizeAliasInput(alias),
     promptId,
+    ...(promptCwd?.trim() ? { promptCwd: promptCwd.trim() } : {}),
     createdAt: new Date().toISOString()
   };
   store.aliases.push(entry);

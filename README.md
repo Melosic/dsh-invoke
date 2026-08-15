@@ -14,7 +14,7 @@ The plugin runs as a **Host + Client two-part plugin**: the Host side (Node) reg
 
 - **Sidebar GUI first**: add / edit / delete / view / search / category management, all visual.
 - **Quick invoke (copy to clipboard)**: click "Copy" → fill variables → copy → paste and send. Independent of Harness's internal DOM, 100% compatible.
-- **Variable substitution**: Mustache-style `{{var}}` placeholders, filled interactively via a dialog on invoke, with experimental auto-extraction from the editor selection.
+- **Variable substitution**: Mustache-style `{{var}}` placeholders, filled interactively via a dialog on invoke. (Auto-extraction from the editor selection is planned — the extraction engine is ready, waiting for a selection API from the host.)
 - **Category tree + live search**: left-hand category filter, top search box with real-time filtering (title / description / tags / body), with matched-keyword highlighting.
 - **Light / dark theme**: follows Harness's `data-ds-dark-theme` mechanism automatically, with in-panel manual override.
 - **Two-layer storage merge**: user-level global storage + project-level storage, project-level wins.
@@ -283,7 +283,7 @@ A: Project-level takes priority; for a duplicate ID, the project-level config wi
 
 **Q: How do I use auto variable extraction? Why does it sometimes not work?**
 
-A: Auto-extraction is experimental. Select code in the Harness editor first, then click "Copy". If the current version doesn't support the editor selection API, or no code is selected, the dialog will prompt for manual input.
+A: Auto-extraction is planned and not yet wired up: the extraction engine is implemented, but the current Harness web client exposes no editor-selection API, so the dialog always asks for manual input. It will light up automatically once the host provides selection access.
 
 **Q: Do I have to use the command line?**
 

@@ -11,6 +11,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { WebviewPanel } from '../ui/WebviewPanel.js';
 import { injectStyles } from '../ui/styles.js';
 import { setupI18n } from '../ui/i18n.js';
+import { initApiClient } from './api.js';
 
 export const name = 'dsh-invoke-client';
 export const version = '0.1.0';
@@ -259,6 +260,10 @@ export function apply(ctx: Context) {
 
   // 注册双语字典到官方 locale 服务（不可用时回退内置 zh）
   setupI18n(ctx);
+
+  // 解析会话工作目录并缓存：后续所有 API 请求携带 ?cwd=/body.cwd，
+  // 使 GUI 的项目级存储显式定位（而非依赖 host 进程启动目录），并过 host 端 cwd 白名单
+  void initApiClient();
 
   // 加载时即注入全局样式（幂等），确保侧边栏入口按钮立即可见且有样式
   injectStyles();

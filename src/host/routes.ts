@@ -11,6 +11,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { stat } from 'node:fs/promises';
 import * as path from 'path';
+import { ht } from '../shared/host-messages.js';
 import type { Context } from '@deepseek-ai/cordis';
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver';
 import {
@@ -199,13 +200,13 @@ export function registerRoutes(ctx: Context): () => void {
         ...route,
         handler: async (req, res) => {
           if (!isAllowedHost(req)) {
-            return forbidden(res, '请求被拒绝：Host 不在允许范围（仅本机/局域网地址）');
+            return forbidden(res, ht('api.hostForbidden'));
           }
           if (!isSameOrigin(req)) {
-            return forbidden(res, '请求被拒绝：跨站请求（Origin 校验失败）');
+            return forbidden(res, ht('api.originForbidden'));
           }
           if (!(await isCwdAllowed(ctx, queryCwd(req.url)))) {
-            return badRequest(res, '工作目录（cwd）不在允许范围内');
+            return badRequest(res, ht('api.cwdNotAllowed'));
           }
           return route.handler(req, res);
         },
@@ -234,10 +235,10 @@ export function registerRoutes(ctx: Context): () => void {
             'builtin' | 'usageCount' | 'createdAt' | 'updatedAt'
           > & { cwd?: string };
           if (!body.id || !body.title || !body.body) {
-            return badRequest(res, '缺少必填字段（id / title / body）');
+            return badRequest(res, ht('api.missingFields'));
           }
           if (!(await isCwdAllowed(ctx, body.cwd ?? queryCwd(req.url)))) {
-            return badRequest(res, '工作目录（cwd）不在允许范围内');
+            return badRequest(res, ht('api.cwdNotAllowed'));
           }
           const created = addPrompt(body, body.cwd?.trim() || queryCwd(req.url));
           return json(res, 201, created);
@@ -284,14 +285,14 @@ export function registerRoutes(ctx: Context): () => void {
             Omit<Prompt, 'id' | 'builtin' | 'createdAt'>
           > & { cwd?: string };
           if (!(await isCwdAllowed(ctx, body.cwd ?? cwd))) {
-            return badRequest(res, '工作目录（cwd）不在允许范围内');
+            return badRequest(res, ht('api.cwdNotAllowed'));
           }
           const updated = updatePrompt(
             id,
             body,
             body.cwd?.trim() || cwd
           );
-          if (!updated) return notFound(res, `提示词 ${id} 不存在`);
+          if (!updated) return notFound(res, ht('api.promptNotFound', { id }));
           return json(res, 200, updated);
         } catch (error) {
           return error instanceof Error
@@ -328,14 +329,14 @@ export function registerRoutes(ctx: Context): () => void {
         try {
           const body = (await readJsonBody(req)) as { alias?: string; promptId?: string; cwd?: string };
           if (!body.alias || !body.promptId) {
-            return badRequest(res, '缺少必填字段（alias / promptId）');
+            return badRequest(res, ht('api.aliasMissingFields'));
           }
           if (!(await isCwdAllowed(ctx, body.cwd ?? queryCwd(req.url)))) {
-            return badRequest(res, '工作目录（cwd）不在允许范围内');
+            return badRequest(res, ht('api.cwdNotAllowed'));
           }
           const cwd = body.cwd?.trim() || queryCwd(req.url);
           if (!getPromptById(body.promptId, cwd)) {
-            return badRequest(res, `提示词 ID「${body.promptId}」不存在`);
+            return badRequest(res, ht('api.aliasPromptNotFound', { id: body.promptId }));
           }
 
           // upsert 语义：一个提示词一个别名，重设时替换旧别名
@@ -348,12 +349,12 @@ export function registerRoutes(ctx: Context): () => void {
             removeAlias(existing.alias);
           }
 
-          const entry = addAlias(body.alias, body.promptId);
+          const entry = addAlias(body.alias, body.promptId, cwd);
           const failed = syncAliasCommands(ctx);
           if (failed.length > 0) {
             return json(res, 201, {
               ...entry,
-              warning: `别名已保存，但命令 /${entry.alias} 注册失败（可能与其他命令重名），请换一个别名`
+              warning: ht('api.aliasCmdFailed', { alias: entry.alias })
             });
           }
           return json(res, 201, entry);
@@ -366,7 +367,7 @@ export function registerRoutes(ctx: Context): () => void {
 
       if (req.method === 'DELETE') {
         const name = url.searchParams.get('name');
-        if (!name) return badRequest(res, '缺少别名（?name=）');
+        if (!name) return badRequest(res, ht('api.aliasNameMissing'));
         const removed = removeAlias(name);
         if (removed) syncAliasCommands(ctx);
         return json(res, 200, { success: removed });
@@ -392,10 +393,10 @@ export function registerRoutes(ctx: Context): () => void {
         try {
           const body = (await readJsonBody(req)) as { name?: string; cwd?: string };
           if (!body.name || !body.name.trim()) {
-            return badRequest(res, '分类名称不能为空');
+            return badRequest(res, ht('api.categoryEmpty'));
           }
           if (!(await isCwdAllowed(ctx, body.cwd ?? queryCwd(req.url)))) {
-            return badRequest(res, '工作目录（cwd）不在允许范围内');
+            return badRequest(res, ht('api.cwdNotAllowed'));
           }
           addCustomCategory(body.name.trim(), body.cwd?.trim() || queryCwd(req.url));
           return json(res, 201, { success: true });
@@ -406,7 +407,7 @@ export function registerRoutes(ctx: Context): () => void {
 
       if (req.method === 'DELETE') {
         const name = url.searchParams.get('name');
-        if (!name) return badRequest(res, '缺少分类名称（?name=）');
+        if (!name) return badRequest(res, ht('api.categoryNameMissing'));
         removeCustomCategory(name, queryCwd(req.url));
         return json(res, 200, { success: true });
       }
@@ -430,10 +431,10 @@ export function registerRoutes(ctx: Context): () => void {
           cwd?: string;
         };
         if (typeof body.content !== 'string' || !body.content) {
-          return badRequest(res, '缺少导入内容');
+          return badRequest(res, ht('api.importContentMissing'));
         }
         if (!(await isCwdAllowed(ctx, body.cwd ?? queryCwd(req.url)))) {
-          return badRequest(res, '工作目录（cwd）不在允许范围内');
+          return badRequest(res, ht('api.cwdNotAllowed'));
         }
         const cwd = body.cwd?.trim() || queryCwd(req.url);
         const result: ImportResult =

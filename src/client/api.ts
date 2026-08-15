@@ -14,6 +14,52 @@ export type { Prompt, PromptSortMode, PromptStorage, Variable };
 /** host 端注册的 API 前缀（与 src/host/routes.ts 保持一致） */
 const API_BASE = '/api/dsh-invoke';
 
+// ============ 会话工作目录 ============
+
+/**
+ * 当前会话工作目录（项目级存储定位用）。
+ * initApiClient() 从 /workspace 解析后缓存；null 表示无工作区或未知（不携带，host 用进程默认）。
+ * 所有请求统一携带后，写路径显式经过 host 端 cwd 白名单校验。
+ */
+let sessionCwd: string | null = null;
+
+export interface WorkspaceInfo {
+  workspaceRoot: string | null;
+  projectStoragePath: string | null;
+  registeredWorkspace: boolean | null;
+}
+
+/**
+ * 初始化 client API 上下文：解析会话工作目录。
+ * 在 client apply() 中调用一次；失败时静默保持无 cwd 模式（host 回退进程默认）。
+ */
+export async function initApiClient(): Promise<WorkspaceInfo | null> {
+  try {
+    const info = await request<WorkspaceInfo>('/workspace');
+    // 仅在目录确认未注册（registeredWorkspace === false）时放弃携带，
+    // 未知（null）与已注册（true）均携带，避免误伤无注册表的宿主
+    sessionCwd =
+      info.workspaceRoot && info.registeredWorkspace !== false ? info.workspaceRoot : null;
+    return info;
+  } catch {
+    sessionCwd = null;
+    return null;
+  }
+}
+
+/** 向查询串追加会话 cwd（已有参数时用 & 拼接） */
+function withCwdQuery(path: string): string {
+  if (!sessionCwd) return path;
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}cwd=${encodeURIComponent(sessionCwd)}`;
+}
+
+/** 向 JSON 请求体合并会话 cwd */
+function withCwdBody<T extends object>(body: T): T {
+  if (!sessionCwd) return body;
+  return { ...body, cwd: sessionCwd };
+}
+
 // ============ 底层请求 ============
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -44,7 +90,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 /** 获取按指定模式排序的提示词列表 */
 export async function getSortedPrompts(mode: PromptSortMode = 'smart'): Promise<Prompt[]> {
-  const data = await request<{ prompts: Prompt[] }>(`/prompts?sort=${mode}`);
+  const data = await request<{ prompts: Prompt[] }>(withCwdQuery(`/prompts?sort=${mode}`));
   return data.prompts;
 }
 
@@ -63,7 +109,7 @@ export async function addPrompt(
 ): Promise<Prompt> {
   return request<Prompt>('/prompts', {
     method: 'POST',
-    body: JSON.stringify(prompt),
+    body: JSON.stringify(withCwdBody(prompt)),
   });
 }
 
@@ -73,9 +119,9 @@ export async function updatePrompt(
   updates: Partial<Omit<Prompt, 'id' | 'builtin' | 'createdAt'>>
 ): Promise<Prompt | null> {
   try {
-    return await request<Prompt>(`/prompt/${encodeURIComponent(id)}`, {
+    return await request<Prompt>(withCwdQuery(`/prompt/${encodeURIComponent(id)}`), {
       method: 'PUT',
-      body: JSON.stringify(updates),
+      body: JSON.stringify(withCwdBody(updates)),
     });
   } catch {
     return null;
@@ -84,7 +130,7 @@ export async function updatePrompt(
 
 /** 删除提示词 */
 export async function deletePrompt(id: string): Promise<boolean> {
-  const data = await request<{ success: boolean }>(`/prompt/${encodeURIComponent(id)}`, {
+  const data = await request<{ success: boolean }>(withCwdQuery(`/prompt/${encodeURIComponent(id)}`), {
     method: 'DELETE',
   });
   return data.success;
@@ -92,7 +138,7 @@ export async function deletePrompt(id: string): Promise<boolean> {
 
 /** 增加使用次数 */
 export async function incrementUsage(id: string): Promise<void> {
-  await request<{ success: boolean }>(`/prompt/${encodeURIComponent(id)}/use`, {
+  await request<{ success: boolean }>(withCwdQuery(`/prompt/${encodeURIComponent(id)}/use`), {
     method: 'POST',
   });
 }
@@ -101,7 +147,7 @@ export async function incrementUsage(id: string): Promise<void> {
 
 /** 获取所有分类 */
 export async function getAllCategories(): Promise<string[]> {
-  const data = await request<{ categories: string[] }>('/categories');
+  const data = await request<{ categories: string[] }>(withCwdQuery('/categories'));
   return data.categories;
 }
 
@@ -109,14 +155,14 @@ export async function getAllCategories(): Promise<string[]> {
 export async function addCustomCategory(name: string): Promise<void> {
   await request<{ success: boolean }>('/categories', {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(withCwdBody({ name })),
   });
 }
 
 /** 删除自定义分类 */
 export async function removeCustomCategory(name: string): Promise<void> {
   await request<{ success: boolean }>(
-    `/categories?name=${encodeURIComponent(name)}`,
+    withCwdQuery(`/categories?name=${encodeURIComponent(name)}`),
     { method: 'DELETE' }
   );
 }
@@ -142,7 +188,7 @@ export async function getAllAliases(): Promise<AliasEntry[]> {
 export async function addAlias(alias: string, promptId: string): Promise<AliasEntry> {
   return request<AliasEntry>('/aliases', {
     method: 'POST',
-    body: JSON.stringify({ alias, promptId }),
+    body: JSON.stringify(withCwdBody({ alias, promptId })),
   });
 }
 
@@ -171,7 +217,7 @@ export async function importPrompts(
   try {
     return await request<ImportResult>('/import', {
       method: 'POST',
-      body: JSON.stringify({ content, format, mode }),
+      body: JSON.stringify(withCwdBody({ content, format, mode })),
     });
   } catch (error) {
     return {
@@ -185,5 +231,5 @@ export async function importPrompts(
 
 /** 导出提示词（返回 JSON/YAML 字符串） */
 export async function exportPrompts(format: 'json' | 'yaml' = 'json'): Promise<string> {
-  return request<string>(`/export?format=${format}`);
+  return request<string>(withCwdQuery(`/export?format=${format}`));
 }
