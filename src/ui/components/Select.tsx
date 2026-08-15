@@ -90,7 +90,7 @@ export const Select: React.FC<SelectProps> = ({ value, options, onChange, classN
       </button>
 
       {open && pos && createPortal(
-        <div className="pv-dd-panel" style={{ top: pos.top, left: pos.left, width: pos.width }} role="listbox">
+        <div className="pv-dd-panel pv-scope" style={{ top: pos.top, left: pos.left, width: pos.width }} role="listbox">
           {options.map(o => (
             <div
               key={o.value}

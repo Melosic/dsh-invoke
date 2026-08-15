@@ -18,15 +18,21 @@ export function injectStyles(): void {
   style.textContent = `
 /* ============ 设计 Token（亮色）============ */
 /* 对齐 @deepseek-ai/dsh-client-ui-theme 的 design-platform.css */
+/* 根锚点容器：作为 body 上的覆盖层挂载，flex 纵向撑满 */
 #dsh-invoke-root {
-  /* 根锚点容器：作为 body 上的覆盖层挂载，flex 纵向撑满 */
   position: fixed;
   inset: 0;
   z-index: 9990;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
 
+/* Token 作用域：面板根节点 + Portal 到 body 的浮层。
+   Portal 元素脱离 #dsh-invoke-root 后 CSS 变量会失效（背景透明等），
+   必须挂 .pv-scope 重新进入变量作用域 */
+#dsh-invoke-root,
+.pv-scope {
   /* 色板 - static */
   --nb-00: rgb(255,255,255);
   --nb-50: rgb(249,250,251);
@@ -116,7 +122,10 @@ export function injectStyles(): void {
 /* ============ 暗色主题 ============ */
 body[data-ds-dark-theme="true"] #dsh-invoke-root,
 body[data-ds-dark-theme] #dsh-invoke-root,
-#dsh-invoke-root[data-pv-theme="dark"] {
+#dsh-invoke-root[data-pv-theme="dark"],
+body[data-ds-dark-theme="true"] .pv-scope,
+body[data-ds-dark-theme] .pv-scope,
+.pv-scope[data-pv-theme="dark"] {
   --pv-bg-base: var(--nb-950);
   --pv-bg-layer: var(--nb-900);
   --pv-bg-card: var(--nb-875);
