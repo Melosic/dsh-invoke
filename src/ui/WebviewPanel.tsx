@@ -20,6 +20,7 @@ import {
 } from './icons.js';
 import { useTheme, ThemeMode } from './theme.js';
 import { injectStyles } from './styles.js';
+import { useT, t } from './i18n.js';
 import { PromptFormModal } from './components/PromptFormModal.js';
 import { CategoryTree } from './components/CategoryTree.js';
 import { VariableDialog } from './components/VariableDialog.js';
@@ -53,6 +54,7 @@ export interface WebviewPanelProps {
 }
 
 export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: getSelectedTextProp, onClose }) => {
+  useT(); // 语言切换时整棵面板树重渲染
   const theme = useTheme(); // 主题：跟随系统 + 手动覆盖
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -225,7 +227,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
       navigator.clipboard.writeText(text).then(() => {
         incrementUsage(promptId);
         loadData();
-        showToast('已复制到剪贴板');
+        showToast(t('toast.copied'));
       }).catch(() => {
         fallbackCopy(text, promptId);
       });
@@ -243,9 +245,9 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
       document.execCommand('copy');
       incrementUsage(promptId);
       loadData();
-      showToast('已复制到剪贴板');
+      showToast(t('toast.copied'));
     } catch {
-      showToast('复制失败，请手动复制');
+      showToast(t('toast.copyFailed'));
     }
     document.body.removeChild(textarea);
   };
@@ -287,12 +289,12 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('导出成功');
+    showToast(t('toast.exported'));
   };
 
   const handleImportSuccess = () => {
     loadData();
-    showToast('导入成功');
+    showToast(t('toast.imported'));
   };
 
   // ============ 主题切换（仅覆盖插件根容器，不污染全局） ============
@@ -362,15 +364,15 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
           <button
             className="pv-icon-btn"
             onClick={handleToggleTheme}
-            title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+            title={theme === 'dark' ? t('header.themeToLight') : t('header.themeToDark')}
             aria-pressed={theme === 'dark'}
           >
             {theme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
           </button>
-          <button className="pv-icon-btn" onClick={handleAdd} title="新增提示词">
+          <button className="pv-icon-btn" onClick={handleAdd} title={t('header.addTitle')}>
             <PlusIcon size={16} />
           </button>
-          <button className="pv-icon-btn" onClick={closePanel} title="关闭面板 (Esc)" aria-label="关闭面板">
+          <button className="pv-icon-btn" onClick={closePanel} title={t('header.closeTitle')} aria-label={t('header.closeAria')}>
             <XIcon size={16} />
           </button>
         </div>
@@ -399,12 +401,12 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
               <input
                 className="pv-search-input"
                 type="text"
-                placeholder="搜索标题、描述、标签..."
+                placeholder={t('search.placeholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <span className="pv-stats">共 {filteredPrompts.length} 条</span>
+            <span className="pv-stats">{t('search.stats', { count: filteredPrompts.length })}</span>
           </div>
 
           {/* 卡片网格 */}
@@ -415,12 +417,12 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                   <InboxIcon size={22} />
                 </div>
                 <div className="pv-empty-title">
-                  {searchQuery || selectedCategory ? '没有匹配的提示词' : '暂无提示词'}
+                  {searchQuery || selectedCategory ? t('empty.noMatch') : t('empty.none')}
                 </div>
                 <div className="pv-empty-desc">
                   {searchQuery || selectedCategory
-                    ? '换个关键词或分类试试'
-                    : '点击右上角「+」添加第一条提示词'}
+                    ? t('empty.noMatchDesc')
+                    : t('empty.noneDesc')}
                 </div>
               </div>
             ) : (
@@ -434,21 +436,21 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                       <button
                         className="pv-card-action-btn"
                         onClick={() => setAliasTarget(prompt)}
-                        title={aliasEntry ? `别名 /${aliasEntry.alias}，点击修改` : '设置别名'}
+                        title={aliasEntry ? t('card.aliasEdit', { alias: aliasEntry.alias }) : t('card.aliasSet')}
                       >
                         <LinkIcon size={13} />
                       </button>
                       <button
                         className="pv-card-action-btn"
                         onClick={() => handleEdit(prompt)}
-                        title="编辑"
+                        title={t('common.edit')}
                       >
                         <EditIcon size={13} />
                       </button>
                       <button
                         className="pv-card-action-btn danger"
                         onClick={() => handleDelete(prompt)}
-                        title="删除"
+                        title={t('card.deleteTitle')}
                       >
                         <DeleteIcon size={13} />
                       </button>
@@ -461,7 +463,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                         className="pv-tag pv-tag-alias"
                         role="button"
                         tabIndex={0}
-                        title="点击修改别名"
+                        title={t('card.aliasTagTitle')}
                         onClick={() => setAliasTarget(prompt)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
@@ -477,7 +479,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                       <span key={tag} className="pv-tag">{tag}</span>
                     ))}
                     {prompt.builtin && (
-                      <span className="pv-tag pv-tag-builtin">示例</span>
+                      <span className="pv-tag pv-tag-builtin">{t('card.builtin')}</span>
                     )}
                   </div>
 
@@ -495,7 +497,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                       }
                     }}
                   >
-                    {expandedIds.has(prompt.id) ? '收起正文 ▾' : '展开正文 ▸'}
+                    {expandedIds.has(prompt.id) ? t('card.collapse') : t('card.expand')}
                   </span>
                   {expandedIds.has(prompt.id) && (
                     <div className="pv-card-body">{prompt.body}</div>
@@ -507,7 +509,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                       onClick={() => handleCopy(prompt)}
                     >
                       <CopyIcon size={12} />
-                      复制
+                      {t('card.copy')}
                     </button>
                   </div>
                 </div>
@@ -522,7 +524,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
       <div className="pv-toolbar">
         <button className="pv-toolbar-btn" onClick={() => setIsImportDialogOpen(true)}>
           <ImportIcon size={12} />
-          导入
+          {t('toolbar.import')}
         </button>
 
         {/* 导出下拉 */}
@@ -532,7 +534,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
             onClick={() => setIsExportMenuOpen(v => !v)}
           >
             <ExportIcon size={12} />
-            导出
+            {t('toolbar.export')}
             <ChevronDownIcon size={12} />
           </button>
           {isExportMenuOpen && (
@@ -540,23 +542,23 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
               <div className="pv-context-mask" onClick={() => setIsExportMenuOpen(false)} />
               <div className="pv-dropdown-menu">
                 <button className="pv-dropdown-item" onClick={() => handleExportClick('json')}>
-                  导出 JSON
+                  {t('toolbar.exportJson')}
                 </button>
                 <button className="pv-dropdown-item" onClick={() => handleExportClick('yaml')}>
-                  导出 YAML
+                  {t('toolbar.exportYaml')}
                 </button>
               </div>
             </>
           )}
         </div>
 
-        <button className="pv-toolbar-btn" disabled title="Gist 同步规划中，敬请期待">
+        <button className="pv-toolbar-btn" disabled title={t('toolbar.gistTitle')}>
           <GistIcon size={12} />
-          Gist同步
+          {t('toolbar.gist')}
         </button>
         <span className="pv-spacer" />
         <span className="pv-statusbar">
-          v{__DSH_INVOKE_VERSION__} · {prompts.length} 条提示词
+          v{__DSH_INVOKE_VERSION__} · {t('statusbar.count', { count: prompts.length })}
         </span>
       </div>
 
@@ -581,7 +583,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
           }}
           onConfirm={handleVarDialogConfirm}
           title={varDialogPrompt.title}
-          description="请填充以下变量后复制"
+          description={t('varDialog.desc')}
           variables={varDialogVars}
           autoExtractValues={varDialogAutoExtract}
           extractMessage={varDialogExtractMessage}
@@ -598,10 +600,10 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
       {/* 删除确认对话框 */}
       <ConfirmDialog
         isOpen={!!deleteTarget}
-        title="删除提示词"
-        message={deleteTarget ? `确定要删除「${deleteTarget.title}」吗？此操作不可撤销。` : ''}
-        confirmText="删除"
-        cancelText="取消"
+        title={t('deleteDialog.title')}
+        message={deleteTarget ? t('deleteDialog.message', { title: deleteTarget.title }) : ''}
+        confirmText={t('common.delete')}
+        cancelText={t('common.cancel')}
         danger
         onConfirm={confirmDelete}
         onClose={() => setDeleteTarget(null)}

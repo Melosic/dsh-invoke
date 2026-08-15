@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { injectStyles } from '../styles.js';
+import { t } from '../i18n.js';
 import { Prompt, AliasEntry, addAlias, removeAlias } from '../../client/api.js';
 
 interface AliasDialogProps {
@@ -54,7 +55,7 @@ export const AliasDialog: React.FC<AliasDialogProps> = ({
   const handleSave = async () => {
     const trimmed = alias.trim();
     if (!trimmed) {
-      setError('别名不能为空');
+      setError(t('aliasDialog.required'));
       return;
     }
     if (currentAlias && currentAlias.alias === trimmed.replace(/^\//, '').toLowerCase()) {
@@ -67,7 +68,7 @@ export const AliasDialog: React.FC<AliasDialogProps> = ({
       onChanged();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '设置失败，请重试');
+      setError(err instanceof Error ? err.message : t('aliasDialog.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -81,7 +82,7 @@ export const AliasDialog: React.FC<AliasDialogProps> = ({
       onChanged();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '删除失败，请重试');
+      setError(err instanceof Error ? err.message : t('aliasDialog.removeFailed'));
     } finally {
       setBusy(false);
     }
@@ -90,16 +91,15 @@ export const AliasDialog: React.FC<AliasDialogProps> = ({
   return (
     <div className="pv-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="pv-modal pv-modal-sm" onClick={(e) => e.stopPropagation()}>
-        <h2 className="pv-modal-title">设置别名</h2>
+        <h2 className="pv-modal-title">{t('aliasDialog.title')}</h2>
         <p className="pv-modal-desc">
-          为「{prompt.title}」设置快捷调用别名。设置后可在输入框用{' '}
-          <code>/别名 内容</code> 快速调用：渲染后的提示词会复制到剪贴板。
+          {t('aliasDialog.desc', { title: prompt.title })}
         </p>
 
         {error && <div className="pv-error">{error}</div>}
 
         <div className="pv-field">
-          <label className="pv-label" htmlFor="pv-alias-input">别名</label>
+          <label className="pv-label" htmlFor="pv-alias-input">{t('aliasDialog.label')}</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ color: 'var(--pv-text-tertiary)' }}>/</span>
             <input
@@ -108,7 +108,7 @@ export const AliasDialog: React.FC<AliasDialogProps> = ({
               className={`pv-input${error ? ' pv-input-error' : ''}`}
               value={alias}
               onChange={(e) => { setAlias(e.target.value); if (error) setError(''); }}
-              placeholder="例如 cr"
+              placeholder={t('aliasDialog.placeholder')}
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSave();
@@ -116,21 +116,21 @@ export const AliasDialog: React.FC<AliasDialogProps> = ({
             />
           </div>
           <div className="pv-hint">
-            仅小写字母、数字、连字符；不能与 prompt / alias / help 等保留命令重名。
-            {prompt.variables.length > 0 && ' 提示词含变量时，命令后的内容会按顺序填充变量（多变量用 || 分隔）。'}
+            {t('aliasDialog.hint')}
+            {prompt.variables.length > 0 && t('aliasDialog.hintVars')}
           </div>
         </div>
 
         <div className="pv-modal-footer">
           {currentAlias && (
             <button className="pv-btn-danger" onClick={handleRemove} disabled={busy}>
-              删除别名
+              {t('aliasDialog.remove')}
             </button>
           )}
           <span style={{ flex: 1 }} />
-          <button className="pv-btn-secondary" onClick={onClose} disabled={busy}>取消</button>
+          <button className="pv-btn-secondary" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
           <button className="pv-btn-primary" onClick={handleSave} disabled={busy}>
-            保存
+            {t('common.save')}
           </button>
         </div>
       </div>

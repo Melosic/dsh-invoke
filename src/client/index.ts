@@ -10,6 +10,7 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { WebviewPanel } from '../ui/WebviewPanel.js';
 import { injectStyles } from '../ui/styles.js';
+import { setupI18n } from '../ui/i18n.js';
 
 export const name = 'dsh-invoke-client';
 export const version = '0.1.0';
@@ -170,6 +171,9 @@ function mountPanel() {
 
 export function apply(ctx: Context) {
   console.log('[dsh-invoke-client] 🚀 正在加载侧边栏面板...');
+
+  // 注册双语字典到官方 locale 服务（不可用时回退内置 zh）
+  setupI18n(ctx);
 
   // 加载时即注入全局样式（幂等），确保侧边栏入口按钮立即可见且有样式
   injectStyles();

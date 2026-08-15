@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { importPrompts } from '../../client/api.js';
 import { injectStyles } from '../styles.js';
+import { t } from '../i18n.js';
 
 interface ImportDialogProps {
   isOpen: boolean;
@@ -35,7 +36,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
 
   const handleImport = async () => {
     if (!file) {
-      setError('请先选择文件');
+      setError(t('importDialog.noFile'));
       return;
     }
 
@@ -51,7 +52,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
     } catch (error) {
       setResult({
         success: false,
-        message: error instanceof Error ? error.message : '导入失败'
+        message: error instanceof Error ? error.message : t('importDialog.failed')
       });
     } finally {
       setLoading(false);
@@ -82,11 +83,11 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
   return (
     <div className="pv-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div className="pv-modal pv-modal-sm" onClick={(e) => e.stopPropagation()}>
-        <h2 className="pv-modal-title">导入提示词</h2>
-        <p className="pv-modal-desc">从 JSON 或 YAML 文件导入提示词</p>
+        <h2 className="pv-modal-title">{t('importDialog.title')}</h2>
+        <p className="pv-modal-desc">{t('importDialog.desc')}</p>
 
         <div className="pv-field">
-          <label className="pv-label">选择文件</label>
+          <label className="pv-label">{t('importDialog.file')}</label>
           <input
             type="file"
             accept=".json,.yaml,.yml"
@@ -94,12 +95,12 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
             onChange={handleFileChange}
           />
           {file && (
-            <div className="pv-hint">已选择: {file.name}</div>
+            <div className="pv-hint">{t('importDialog.fileSelected', { name: file.name })}</div>
           )}
         </div>
 
         <div className="pv-field">
-          <label className="pv-label">导入模式</label>
+          <label className="pv-label">{t('importDialog.mode')}</label>
           <div className="pv-radio-group">
             <label className="pv-radio">
               <input
@@ -108,7 +109,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
                 checked={mode === 'merge'}
                 onChange={() => setMode('merge')}
               />
-              合并（跳过重复）
+              {t('importDialog.merge')}
             </label>
             <label className="pv-radio">
               <input
@@ -117,13 +118,13 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
                 checked={mode === 'overwrite'}
                 onChange={() => setMode('overwrite')}
               />
-              覆盖全部
+              {t('importDialog.overwrite')}
             </label>
           </div>
           <div className="pv-hint">
             {mode === 'merge'
-              ? '保留已有提示词，仅添加新的'
-              : '用导入的数据完全替换当前所有提示词'}
+              ? t('importDialog.mergeHint')
+              : t('importDialog.overwriteHint')}
           </div>
         </div>
 
@@ -138,14 +139,14 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
         )}
 
         <div className="pv-modal-footer">
-          <button className="pv-btn-secondary" onClick={handleClose}>取消</button>
+          <button className="pv-btn-secondary" onClick={handleClose}>{t('common.cancel')}</button>
           <button
             className="pv-btn-primary"
             onClick={handleImport}
             disabled={!file || loading}
             style={(!file || loading) ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
           >
-            {loading ? '导入中...' : '开始导入'}
+            {loading ? t('importDialog.loading') : t('importDialog.start')}
           </button>
         </div>
       </div>

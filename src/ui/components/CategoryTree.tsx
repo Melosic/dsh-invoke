@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PlusIcon } from '../icons.js';
 import { injectStyles } from '../styles.js';
+import { t } from '../i18n.js';
 import { Prompt, getAllCategories, addCustomCategory, removeCustomCategory } from '../../client/api.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 
@@ -104,7 +105,7 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
       return;
     }
     if (categories.includes(newName)) {
-      setRenameError('该分类名称已存在');
+      setRenameError(t('category.exists'));
       return; // 保持弹窗打开，提示重名
     }
     await removeCustomCategory(oldName);
@@ -133,7 +134,7 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
           className={`pv-cat-item${selectedCategory === null ? ' active' : ''}`}
           onClick={() => onSelectCategory(null)}
         >
-          <span>全部</span>
+          <span>{t('category.all')}</span>
           <span className="pv-cat-count">{prompts.length}</span>
         </button>
 
@@ -162,7 +163,7 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
               className="pv-input"
               value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
-              placeholder="分类名称"
+              placeholder={t('category.namePlaceholder')}
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleAddCategory();
@@ -170,17 +171,17 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
               }}
             />
             <button type="button" className="pv-btn-primary pv-btn-sm" onClick={handleAddCategory}>
-              确定
+              {t('common.confirm')}
             </button>
           </div>
         ) : (
           <button type="button" className="pv-cat-new" onClick={() => setIsAdding(true)}>
             <PlusIcon size={13} />
-            新建分类
+            {t('category.new')}
           </button>
         )}
         {categories.length === 0 && (
-          <div className="pv-cat-hint">创建分类，按主题整理提示词</div>
+          <div className="pv-cat-hint">{t('category.hint')}</div>
         )}
       </div>
 
@@ -200,14 +201,14 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
               className="pv-context-item"
               onClick={() => contextMenu.category && handleRenameCategory(contextMenu.category)}
             >
-              重命名
+              {t('category.rename')}
             </button>
             <button
               type="button"
               className="pv-context-item danger"
               onClick={() => contextMenu.category && handleDeleteCategory(contextMenu.category)}
             >
-              删除
+              {t('common.delete')}
             </button>
           </div>
         </>
@@ -217,11 +218,11 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
       {dialog.type === 'delete' && (
         <ConfirmDialog
           isOpen
-          title={BUILTIN_CATEGORIES.includes(dialog.category) ? '无法删除' : '删除分类'}
+          title={BUILTIN_CATEGORIES.includes(dialog.category) ? t('category.cannotDeleteTitle') : t('category.deleteTitle')}
           message={BUILTIN_CATEGORIES.includes(dialog.category)
-            ? '系统预置分类不可删除。'
-            : `确定要删除分类「${dialog.category}」吗？\n提示词不会被删除，但会失去分类关联。`}
-          confirmText={BUILTIN_CATEGORIES.includes(dialog.category) ? '知道了' : '删除'}
+            ? t('category.cannotDeleteMsg')
+            : t('category.deleteMsg', { name: dialog.category })}
+          confirmText={BUILTIN_CATEGORIES.includes(dialog.category) ? t('category.gotIt') : t('common.delete')}
           danger
           onConfirm={() => BUILTIN_CATEGORIES.includes(dialog.category)
             ? setDialog({ type: null, category: '' })
@@ -232,14 +233,14 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({
       {dialog.type === 'rename' && (
         <ConfirmDialog
           isOpen
-          title={BUILTIN_CATEGORIES.includes(dialog.category) ? '无法重命名' : '重命名分类'}
+          title={BUILTIN_CATEGORIES.includes(dialog.category) ? t('category.cannotRenameTitle') : t('category.renameTitle')}
           message={BUILTIN_CATEGORIES.includes(dialog.category)
-            ? '系统预置分类不可重命名。'
-            : `将「${dialog.category}」重命名为：`}
-          confirmText={BUILTIN_CATEGORIES.includes(dialog.category) ? '知道了' : '确定'}
+            ? t('category.cannotRenameMsg')
+            : t('category.renameMsg', { name: dialog.category })}
+          confirmText={BUILTIN_CATEGORIES.includes(dialog.category) ? t('category.gotIt') : t('common.confirm')}
           showInput={!BUILTIN_CATEGORIES.includes(dialog.category)}
           initialInput={dialog.category}
-          inputPlaceholder="新分类名称"
+          inputPlaceholder={t('category.newNamePlaceholder')}
           error={renameError}
           onConfirm={(v) => BUILTIN_CATEGORIES.includes(dialog.category)
             ? setDialog({ type: null, category: '' })

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Variable } from '../../storage/manager.js';
 import { CopyIcon, CheckIcon, InfoIcon } from '../icons.js';
 import { injectStyles } from '../styles.js';
+import { t } from '../i18n.js';
 
 interface VariableDialogProps {
   isOpen: boolean;
@@ -71,7 +72,7 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
     const newErrors: Record<string, string> = {};
     variables.forEach(v => {
       if (v.required && (!values[v.name] || !values[v.name].trim())) {
-        newErrors[v.name] = '此字段为必填';
+        newErrors[v.name] = t('varDialog.required');
       }
     });
 
@@ -116,7 +117,7 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
                   className="pv-textarea"
                   value={values[v.name] || ''}
                   onChange={(e) => handleChange(v.name, e.target.value)}
-                  placeholder={v.placeholder || `请输入 ${v.name}`}
+                  placeholder={v.placeholder || t('varDialog.inputPlaceholder', { name: v.name })}
                   rows={3}
                   style={hasError ? { borderColor: 'var(--red-600)' } : undefined}
                 />
@@ -127,7 +128,7 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
                   className="pv-input"
                   value={values[v.name] || ''}
                   onChange={(e) => handleChange(v.name, e.target.value)}
-                  placeholder={v.placeholder || `请输入 ${v.name}`}
+                  placeholder={v.placeholder || t('varDialog.inputPlaceholder', { name: v.name })}
                   style={hasError ? { borderColor: 'var(--red-600)' } : undefined}
                 />
               )}
@@ -142,15 +143,15 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
 
         {variables.length === 0 && (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--pv-text-caption)', fontSize: 13 }}>
-            此提示词没有变量，点击下方按钮直接复制
+            {t('varDialog.noVars')}
           </div>
         )}
 
         <div className="pv-modal-footer">
-          <button className="pv-btn-secondary" onClick={onClose}>取消</button>
+          <button className="pv-btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
           <button className="pv-btn-primary" onClick={handleSubmit}>
             <CopyIcon size={14} />
-            复制到剪贴板
+            {t('varDialog.copy')}
           </button>
         </div>
       </div>

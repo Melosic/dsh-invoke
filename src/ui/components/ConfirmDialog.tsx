@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { injectStyles } from '../styles.js';
+import { t } from '../i18n.js';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -24,8 +25,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
   title,
   message,
-  confirmText = '确定',
-  cancelText = '取消',
+  confirmText,
+  cancelText,
   danger = false,
   showInput = false,
   inputPlaceholder,
@@ -62,7 +63,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const handleConfirm = () => {
     if (showInput && !inputValue.trim()) {
-      setInternalError('输入不能为空');
+      setInternalError(t('common.inputRequired'));
       return;
     }
     onConfirm(showInput ? inputValue.trim() : undefined);
@@ -92,12 +93,12 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         )}
 
         <div className="pv-modal-footer">
-          <button className="pv-btn-secondary" onClick={onClose}>{cancelText}</button>
+          <button className="pv-btn-secondary" onClick={onClose}>{cancelText ?? t('common.cancel')}</button>
           <button
             className={danger ? 'pv-btn-danger' : 'pv-btn-primary'}
             onClick={handleConfirm}
           >
-            {confirmText}
+            {confirmText ?? t('common.confirm')}
           </button>
         </div>
       </div>
