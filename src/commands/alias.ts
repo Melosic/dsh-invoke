@@ -1,146 +1,136 @@
 // src/commands/alias.ts
-// 别名管理与 DSH 命令注册
+// 别名命令层：
+//   1. /alias —— 列出所有别名（只读）
+//   2. /<别名> —— 动态注册的调用命令：渲染提示词 → 复制到剪贴板
+// 别名的增删走 HTTP API（host/routes.ts），变更后调用 syncAliasCommands 重新同步。
 
 import { Context } from '@deepseek-ai/cordis';
-import type { CommandResult } from '@deepseek-ai/dsh-commands';
-import * as fs from 'fs';
-import * as path from 'path';
-import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
+import type { CommandResult, CommandInvocation } from '@deepseek-ai/dsh-commands';
 import { getPromptById, incrementUsage } from '../storage/manager.js';
-import { extractVariablesFromBody } from '../engine/template.js';
+import {
+  getAllAliases,
+  getAlias,
+  type AliasEntry,
+} from '../storage/alias-store.js';
+import { renderTemplate } from '../engine/template.js';
+import { resolveVariables } from '../engine/variable-resolver.js';
+import { copyToClipboard } from './clipboard.js';
 
-// 导入 @deepseek-ai/dsh-commands 以激活其 declare module 类型增强，
-// 使 ctx.commands 在 Context 上可见（仅类型导入，无运行时副作用）。
+// ============ 动态命令注册 ============
 
-// ============ 类型定义 ============
-
-export interface AliasEntry {
-  /** 别名（不含开头的 /） */
-  alias: string;
-  /** 关联的提示词 ID */
-  promptId: string;
-  /** 创建时间 */
-  createdAt: string;
-}
-
-interface AliasStore {
-  version: number;
-  aliases: AliasEntry[];
-}
-
-// ============ 存储 ============
-
-const ALIASES_DIR = dshHomePath();
-const ALIASES_FILE = path.join(ALIASES_DIR, 'aliases.json');
-
-function ensureAliasFile(): void {
-  if (!fs.existsSync(ALIASES_DIR)) {
-    fs.mkdirSync(ALIASES_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(ALIASES_FILE)) {
-    fs.writeFileSync(ALIASES_FILE, JSON.stringify({ version: 1, aliases: [] }, null, 2), 'utf-8');
-  }
-}
-
-function readAliases(): AliasStore {
-  ensureAliasFile();
-  try {
-    const raw = fs.readFileSync(ALIASES_FILE, 'utf-8');
-    const data = JSON.parse(raw) as AliasStore;
-    if (!data.aliases) data.aliases = [];
-    return data;
-  } catch {
-    return { version: 1, aliases: [] };
-  }
-}
-
-function writeAliases(store: AliasStore): void {
-  ensureAliasFile();
-  fs.writeFileSync(ALIASES_FILE, JSON.stringify(store, null, 2), 'utf-8');
-}
-
-// ============ 别名 CRUD ============
-
-export function getAllAliases(): AliasEntry[] {
-  return readAliases().aliases;
-}
-
-export function getAlias(alias: string): AliasEntry | null {
-  return readAliases().aliases.find(a => a.alias === alias) || null;
-}
-
-export function getAliasByPromptId(promptId: string): AliasEntry | null {
-  return readAliases().aliases.find(a => a.promptId === promptId) || null;
-}
+/** 已注册的别名命令：alias → disposer */
+const registeredAliasCommands = new Map<string, () => void>();
 
 /**
- * 添加别名，带冲突检测
- * @throws Error 当别名冲突或提示词不存在时
+ * 将别名存储中的变更同步到命令注册表：
+ * 新增别名 → 注册 /<别名> 命令；删除别名 → 注销对应命令。
+ * 幂等，可在任意变更后重复调用。
  */
-export function addAlias(alias: string, promptId: string): AliasEntry {
-  const normalized = alias.trim().replace(/^\//, '').toLowerCase();
-  if (!normalized) {
-    throw new Error('别名不能为空');
+export function syncAliasCommands(ctx: Context): void {
+  if (typeof ctx.commands?.register !== 'function') return;
+
+  const aliases = getAllAliases();
+  const wanted = new Set(aliases.map(a => a.alias));
+
+  // 注销已失效的别名命令
+  for (const [name, dispose] of registeredAliasCommands) {
+    if (!wanted.has(name)) {
+      dispose();
+      registeredAliasCommands.delete(name);
+    }
   }
 
-  const prompt = getPromptById(promptId);
+  // 注册新增的别名命令
+  for (const entry of aliases) {
+    if (registeredAliasCommands.has(entry.alias)) continue;
+    const dispose = ctx.commands.register({
+      name: entry.alias,
+      description: `提示词别名 → ${describePromptTitle(entry)}`,
+      input: { hint: '跟在命令后的内容，用于填充提示词变量' },
+      handler: (invocation) => invokeAlias(entry.alias, invocation),
+    });
+    registeredAliasCommands.set(entry.alias, dispose);
+  }
+}
+
+function describePromptTitle(entry: AliasEntry): string {
+  return getPromptById(entry.promptId)?.title ?? entry.promptId;
+}
+
+// ============ 调用链：/<别名> [内容] ============
+
+/**
+ * 执行别名调用：
+ *   1. 解析别名 → 提示词
+ *   2. 用 rawInput 填充变量（单变量填全部；多变量按声明顺序用 || 分隔）
+ *   3. 渲染模板 → 复制到剪贴板（失败时回显正文供手动复制）
+ */
+async function invokeAlias(alias: string, invocation: CommandInvocation): Promise<CommandResult> {
+  const entry = getAlias(alias);
+  if (!entry) {
+    return { kind: 'error', text: `别名「/${alias}」已不存在，可用 /alias 查看当前列表` };
+  }
+
+  const prompt = getPromptById(entry.promptId);
   if (!prompt) {
-    throw new Error(`提示词 ID「${promptId}」不存在`);
+    return { kind: 'error', text: `别名「/${alias}」指向的提示词已被删除，请重新设置` };
   }
 
-  const store = readAliases();
+  const variables = resolveVariables(prompt.body, prompt.variables);
+  const rawInput = invocation.rawInput.trim();
 
-  // 冲突检测 1：与其他别名冲突
-  const existing = store.aliases.find(a => a.alias === normalized);
-  if (existing) {
-    throw new Error(
-      `别名「/${normalized}」已被使用（指向提示词「${getPromptById(existing.promptId)?.title ?? existing.promptId}」）`
-    );
+  // ---- 填充变量 ----
+  const values: Record<string, string> = {};
+
+  if (variables.length === 1) {
+    // 单变量：整个 rawInput 填入
+    values[variables[0].name] = rawInput;
+  } else if (variables.length > 1) {
+    // 多变量：按声明顺序，用 || 分隔
+    const parts = rawInput ? rawInput.split('||').map(s => s.trim()) : [];
+    variables.forEach((v, i) => {
+      values[v.name] = parts[i] ?? '';
+    });
   }
 
-  // 冲突检测 2：与内置命令冲突
-  const RESERVED = ['prompt', 'prompt-list', 'alias', 'help', 'clear', 'exit'];
-  if (RESERVED.includes(normalized)) {
-    throw new Error(`别名「/${normalized}」与系统保留命令冲突，请换一个`);
+  // ---- 校验必填变量 ----
+  const missing = variables.filter(v => v.required && !(values[v.name] ?? '').trim());
+  if (missing.length > 0) {
+    return {
+      kind: 'error',
+      text: `提示词「${prompt.title}」缺少必填变量：${missing.map(v => v.name).join('、')}\n` +
+        `用法：${usageOf(entry.alias, variables)}\n` +
+        `多变量之间用 || 分隔；也可在 Prompt Vault 面板中点击「复制」交互式填写`
+    };
   }
 
-  const entry: AliasEntry = {
-    alias: normalized,
-    promptId,
-    createdAt: new Date().toISOString()
+  // ---- 渲染 + 复制 ----
+  const rendered = renderTemplate(prompt.body, values);
+  incrementUsage(prompt.id);
+
+  const copied = await copyToClipboard(rendered);
+  if (copied) {
+    return {
+      kind: 'success',
+      text: `✅ 「${prompt.title}」已渲染并复制到剪贴板，粘贴到输入框发送即可`
+    };
+  }
+
+  // 剪贴板不可用（如无头环境）：直接回显正文供手动复制
+  return {
+    kind: 'success',
+    text: `「${prompt.title}」渲染结果（剪贴板不可用，请手动复制）：\n\n${rendered}`
   };
-
-  store.aliases.push(entry);
-  writeAliases(store);
-  return entry;
 }
 
-/**
- * 删除别名
- */
-export function removeAlias(alias: string): boolean {
-  const store = readAliases();
-  const normalized = alias.trim().replace(/^\//, '').toLowerCase();
-  const index = store.aliases.findIndex(a => a.alias === normalized);
-  if (index === -1) return false;
-  store.aliases.splice(index, 1);
-  writeAliases(store);
-  return true;
+/** 生成用法说明，如 /cr <code> 或 /log <date>||<level> */
+function usageOf(alias: string, variables: { name: string }[]): string {
+  if (variables.length === 0) return `/${alias}`;
+  if (variables.length === 1) return `/${alias} <${variables[0].name}>`;
+  return `/${alias} <${variables.map(v => v.name).join('>||<')}>`;
 }
 
-/**
- * 删除提示词时级联删除其别名
- */
-export function removeAliasesByPromptId(promptId: string): void {
-  const store = readAliases();
-  const before = store.aliases.length;
-  store.aliases = store.aliases.filter(a => a.promptId !== promptId);
-  if (store.aliases.length !== before) {
-    writeAliases(store);
-  }
-}
-
-// ============ 命令注册 ============
+// ============ /alias 列表命令 ============
 
 export function registerAliasCommands(ctx: Context): void {
   if (typeof ctx.commands?.register !== 'function') {
@@ -155,16 +145,32 @@ export function registerAliasCommands(ctx: Context): void {
     handler: () => {
       const aliases = getAllAliases();
       if (aliases.length === 0) {
-        return { kind: 'success' as const, text: '🔗 暂无别名，请通过 UI 面板添加' };
+        return {
+          kind: 'success' as const,
+          text: '🔗 暂无别名。可在 Prompt Vault 面板的提示词卡片上点击「别名」按钮添加'
+        };
       }
       const lines = aliases.map(a => {
         const prompt = getPromptById(a.promptId);
         const title = prompt ? prompt.title : '（提示词已删除）';
         return `  /${a.alias} → ${title}`;
       });
-      return { kind: 'success' as const, text: `🔗 别名列表（共 ${aliases.length} 个）\n\n${lines.join('\n')}` };
+      return {
+        kind: 'success' as const,
+        text: `🔗 别名列表（共 ${aliases.length} 个）\n\n${lines.join('\n')}\n\n` +
+          `调用方式：/<别名> [内容]（内容用于填充提示词变量）`
+      };
     },
   });
+
+  // 初始同步 + 卸载时清理全部动态命令
+  ctx.effect(() => {
+    syncAliasCommands(ctx);
+    return () => {
+      registeredAliasCommands.forEach(dispose => dispose());
+      registeredAliasCommands.clear();
+    };
+  }, 'dsh-invoke.alias-commands');
 
   console.log('[dsh-invoke] ✅ alias 命令注册完成');
 }

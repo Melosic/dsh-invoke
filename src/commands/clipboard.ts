@@ -1,57 +1,54 @@
 // src/commands/clipboard.ts
-// 跨平台剪贴板复制工具（命令行版本）
-// 供 prompt 命令和 alias 命令共用
+// 跨平台剪贴板复制工具（Host / Node 端）
+// 供别名命令调用链使用：渲染提示词后复制到系统剪贴板。
+// 实现：spawn 系统剪贴板程序并通过 stdin 写入内容，
+// 不经过 shell 拼接，无注入风险，也不破坏换行/特殊字符。
+
+import { spawn } from 'child_process';
+
+/** 每个平台的候选命令（按优先级依次尝试） */
+function clipboardCandidates(): string[][] {
+  switch (process.platform) {
+    case 'darwin':
+      return [['pbcopy']];
+    case 'win32':
+      return [['clip']];
+    default:
+      // Linux：X11 常见两件套 + Wayland
+      return [
+        ['xclip', '-selection', 'clipboard'],
+        ['xsel', '--clipboard', '--input'],
+        ['wl-copy'],
+      ];
+  }
+}
+
+/** 用 spawn 向单个命令写入文本，返回是否成功 */
+function writeToCommand(command: string[], text: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn(command[0], command.slice(1), { stdio: ['pipe', 'ignore', 'ignore'] });
+    } catch {
+      resolve(false);
+      return;
+    }
+    child.on('error', () => resolve(false));
+    child.on('close', (code) => resolve(code === 0));
+    child.stdin.on('error', () => {
+      // 目标程序提前退出（如 clip 忽略尾部写入）不视为失败
+    });
+    child.stdin.end(text, 'utf-8');
+  });
+}
 
 /**
  * 复制文本到系统剪贴板
- * 由于 Node.js 没有内置剪贴板 API，使用 child_process 调用系统命令
- * @param text 要复制的文本
  * @returns 是否成功
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
-  const { exec } = await import('child_process');
-  const { promisify } = await import('util');
-  const execAsync = promisify(exec);
-
-  // 根据平台选择复制命令
-  let command: string;
-  switch (process.platform) {
-    case 'darwin':
-      command = `echo "${escapeShell(text)}" | pbcopy`;
-      break;
-    case 'win32':
-      command = `echo ${escapeShell(text)} | clip`;
-      break;
-    default:
-      command = `echo "${escapeShell(text)}" | xclip -selection clipboard`;
-      break;
+  for (const command of clipboardCandidates()) {
+    if (await writeToCommand(command, text)) return true;
   }
-
-  try {
-    await execAsync(command);
-    return true;
-  } catch (error) {
-    // 尝试备用方案（xsel）
-    if (process.platform !== 'darwin' && process.platform !== 'win32') {
-      try {
-        await execAsync(`echo "${escapeShell(text)}" | xsel --clipboard --input`);
-        return true;
-      } catch {
-        // 两者都失败，返回 false
-      }
-    }
-    return false;
-  }
+  return false;
 }
-
-/**
- * 转义 shell 特殊字符，避免注入
- */
-function escapeShell(text: string): string {
-  return text
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/`/g, '\\`')
-    .replace(/\$/g, '\\$');
-}
-
