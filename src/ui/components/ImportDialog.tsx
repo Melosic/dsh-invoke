@@ -66,6 +66,17 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
     onClose();
   };
 
+  // Esc 关闭（document 级监听，焦点不在输入框时同样生效；走 handleClose 以重置表单状态）
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (

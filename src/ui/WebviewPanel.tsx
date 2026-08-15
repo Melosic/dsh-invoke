@@ -1,6 +1,6 @@
 // src/ui/WebviewPanel.tsx
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   SearchIcon,
   PlusIcon,
@@ -15,7 +15,8 @@ import {
   MoonIcon,
   SunIcon,
   BookmarkIcon,
-  LinkIcon
+  LinkIcon,
+  XIcon
 } from './icons.js';
 import { useTheme, ThemeMode } from './theme.js';
 import { injectStyles } from './styles.js';
@@ -41,12 +42,17 @@ import { AliasDialog } from './components/AliasDialog.js';
 
 // ============ React 组件 ============
 
+/** 由 esbuild define 注入（scripts/build-client.mjs 读取 package.json 版本），保证版本号单源 */
+declare const __DSH_INVOKE_VERSION__: string;
+
 export interface WebviewPanelProps {
   /** 预留：可选获取编辑器选中文本的回调（浏览器端暂不注入） */
   getSelectedText?: () => string | null;
+  /** 关闭面板（由 client/index.ts 注入，隐藏挂载根节点） */
+  onClose?: () => void;
 }
 
-export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: getSelectedTextProp }) => {
+export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: getSelectedTextProp, onClose }) => {
   const theme = useTheme(); // 主题：跟随系统 + 手动覆盖
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -82,6 +88,31 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
   useEffect(() => {
     injectStyles();
   }, []);
+
+  // 关闭面板：优先走注入的 onClose，回退到直接隐藏挂载根节点
+  const closePanel = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      document.getElementById('dsh-invoke-root')?.style.setProperty('display', 'none');
+    }
+  };
+
+  // Esc 分层关闭：弹窗打开时交给弹窗自身处理；下拉打开时先收下拉；否则关闭面板
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (isModalOpen || isVarDialogOpen || isImportDialogOpen || deleteTarget || aliasTarget) return;
+      if (isExportMenuOpen) {
+        setIsExportMenuOpen(false);
+        return;
+      }
+      closePanel();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isModalOpen, isVarDialogOpen, isImportDialogOpen, deleteTarget, aliasTarget, isExportMenuOpen, onClose]);
 
   // ============ 加载数据 ============
 
@@ -219,16 +250,23 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
     document.body.removeChild(textarea);
   };
 
-  // Toast 提示
+  // Toast 提示（对齐官方时序：3s 保持 + 1s 淡出；单实例，新提示替换旧提示）
+  const toastRef = useRef<HTMLDivElement | null>(null);
   const showToast = (message: string) => {
+    toastRef.current?.remove();
     const toast = document.createElement('div');
     toast.className = 'pv-toast';
+    toast.setAttribute('role', 'alert');
     toast.textContent = message;
     document.body.appendChild(toast);
+    toastRef.current = toast;
     setTimeout(() => {
       toast.style.opacity = '0';
-      setTimeout(() => document.body.removeChild(toast), 300);
-    }, 2500);
+      setTimeout(() => {
+        toast.remove();
+        if (toastRef.current === toast) toastRef.current = null;
+      }, 1000);
+    }, 3000);
   };
 
   const handleModalSuccess = () => {
@@ -325,11 +363,15 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
             className="pv-icon-btn"
             onClick={handleToggleTheme}
             title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+            aria-pressed={theme === 'dark'}
           >
             {theme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
           </button>
           <button className="pv-icon-btn" onClick={handleAdd} title="新增提示词">
             <PlusIcon size={16} />
+          </button>
+          <button className="pv-icon-btn" onClick={closePanel} title="关闭面板 (Esc)" aria-label="关闭面板">
+            <XIcon size={16} />
           </button>
         </div>
       </div>
@@ -445,6 +487,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                     onClick={() => toggleExpand(prompt.id)}
                     role="button"
                     tabIndex={0}
+                    aria-expanded={expandedIds.has(prompt.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
@@ -513,7 +556,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
         </button>
         <span className="pv-spacer" />
         <span className="pv-statusbar">
-          v0.1.0 · {prompts.length} 条提示词
+          v{__DSH_INVOKE_VERSION__} · {prompts.length} 条提示词
         </span>
       </div>
 

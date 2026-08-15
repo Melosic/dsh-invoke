@@ -35,6 +35,16 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
     injectStyles();
   }, []);
 
+  // Esc 关闭（document 级监听，焦点不在输入框时同样生效）
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   useEffect(() => {
     if (isOpen) {
       if (editPrompt) {

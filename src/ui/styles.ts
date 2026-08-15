@@ -799,10 +799,10 @@ body[data-ds-dark-theme] #dsh-invoke-root,
 }
 .pv-grid::-webkit-scrollbar-track, .pv-sidebar::-webkit-scrollbar-track, .pv-modal::-webkit-scrollbar-track { background: transparent; }
 
-/* Toast */
+/* Toast（对齐官方：距视口顶 120px、水平居中、3s 保持 + 1s 淡出）*/
 .pv-toast {
   position: fixed;
-  bottom: 32px;
+  top: 120px;
   left: 50%;
   transform: translateX(-50%);
   padding: 8px 18px;
@@ -812,7 +812,7 @@ body[data-ds-dark-theme] #dsh-invoke-root,
   font-size: 13px;
   z-index: 10000;
   box-shadow: var(--pv-shadow-2);
-  transition: opacity 0.3s ease;
+  transition: opacity 1s ease;
   font-family: var(--pv-font);
 }
 
@@ -862,7 +862,7 @@ body[data-ds-dark-theme] #dsh-invoke-root,
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 @keyframes pv-toast-in {
-  from { opacity: 0; transform: translate(-50%, 8px); }
+  from { opacity: 0; transform: translate(-50%, -8px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 @keyframes pv-menu-in {
@@ -962,10 +962,15 @@ body[data-ds-dark-theme] #dsh-invoke-root,
 
 /* 减少动态偏好：尊重系统设置 */
 @media (prefers-reduced-motion: reduce) {
-  .pv-card, .pv-modal, .pv-overlay, .pv-toast, .pv-context-menu,
+  .pv-card, .pv-modal, .pv-overlay, .pv-context-menu,
   .pv-btn-primary, .pv-btn-secondary, .pv-icon-btn, .pv-card-action-btn {
     animation: none !important;
     transition: none !important;
+  }
+  /* 官方约定：reduce-motion 下取消 Toast 滑入，仅保留延迟淡出 */
+  .pv-toast {
+    animation: none !important;
+    transition: opacity 1s ease !important;
   }
 }
 

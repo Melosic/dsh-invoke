@@ -39,6 +39,16 @@ export const AliasDialog: React.FC<AliasDialogProps> = ({
     }
   }, [isOpen, currentAlias]);
 
+  // Esc 关闭（document 级监听，焦点不在输入框时同样生效）
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !prompt) return null;
 
   const handleSave = async () => {
@@ -102,7 +112,6 @@ export const AliasDialog: React.FC<AliasDialogProps> = ({
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSave();
-                if (e.key === 'Escape') onClose();
               }}
             />
           </div>

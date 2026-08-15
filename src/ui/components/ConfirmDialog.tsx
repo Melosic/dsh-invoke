@@ -48,6 +48,16 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     }
   }, [isOpen, initialInput]);
 
+  // Esc 关闭（document 级监听，焦点不在输入框时同样生效）
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleConfirm = () => {
@@ -75,7 +85,6 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleConfirm();
-                if (e.key === 'Escape') onClose();
               }}
             />
             {(internalError || error) && <div className="pv-hint pv-hint-error">{internalError || error}</div>}

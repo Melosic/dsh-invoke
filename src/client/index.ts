@@ -93,12 +93,8 @@ function injectSidebarButton(ctx: Context): () => void {
     btn.setAttribute('aria-label', 'Prompt Vault');
     btn.setAttribute('title', 'Prompt Vault');
     btn.innerHTML = `
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14 2 14 8 20 8"/>
-        <line x1="16" y1="13" x2="8" y2="13"/>
-        <line x1="16" y1="17" x2="8" y2="17"/>
-        <polyline points="10 9 9 9 8 9"/>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M8.5 1H3.5a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5V5.5L8.5 1zM8.5 2.2v2.8h2.8L8.5 2.2zM5.5 8h5v1h-5V8zm0 2.5h5v1h-5v-1z"/>
       </svg>
       <span class="dsh-invoke-sidebar-label">Prompt Vault</span>
     `;
@@ -138,13 +134,21 @@ function injectSidebarButton(ctx: Context): () => void {
   return () => observer.disconnect();
 }
 
+/** 隐藏面板（保留 DOM 与 React 状态，便于再次打开） */
+function hidePanel() {
+  const root = document.getElementById(PANEL_ROOT_ID);
+  if (root) root.style.display = 'none';
+}
+
 /** 切换面板显示/隐藏 */
 function togglePanel() {
   const root = document.getElementById(PANEL_ROOT_ID);
   if (!root) {
     mountPanel();
+  } else if (root.style.display === 'none') {
+    root.style.display = 'flex';
   } else {
-    root.style.display = root.style.display === 'none' ? 'flex' : 'none';
+    hidePanel();
   }
 }
 
@@ -158,7 +162,7 @@ function mountPanel() {
   document.body.appendChild(container);
 
   const root = createRoot(container);
-  root.render(React.createElement(WebviewPanel, {}));
+  root.render(React.createElement(WebviewPanel, { onClose: hidePanel }));
 
   // 存储 root 以便卸载
   container.dataset.root = '';
