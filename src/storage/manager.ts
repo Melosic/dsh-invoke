@@ -9,6 +9,7 @@ import {
   hasProjectStorage,
   getWorkspaceRoot
 } from './context.js';
+import { removeAliasesByPromptId } from './alias-store.js';
 
 // ============ 类型定义 ============
 
@@ -187,11 +188,14 @@ export function getMergedStorage(): {
     return { storage: userStorage, writable: hasProjectStorage() ? 'both' : 'user' };
   }
 
-  // 合并分类：预置 + 用户自定义 + 项目自定义
+  // 合并分类：预置 + 用户自定义 + 项目自定义 + 两层存储中出现的非预置分类
+  const extraCategories = [...userStorage.categories, ...projectStorage.categories]
+    .filter(c => !DEFAULT_CATEGORIES.includes(c));
   const customCategories = [
     ...new Set([
       ...userStorage.customCategories,
-      ...projectStorage.customCategories
+      ...projectStorage.customCategories,
+      ...extraCategories
     ])
   ];
 
@@ -209,6 +213,28 @@ export function getMergedStorage(): {
     },
     writable: hasProjectStorage() ? 'both' : 'user'
   };
+}
+
+// ============ 写入层级策略 ============
+
+/**
+ * 获取当前写入目标层级的存储（与 addPrompt 策略一致）：
+ * 有工作区 → 项目级（不存在则以默认结构起步）；无工作区 → 用户级
+ */
+export function getActiveLayerStorage(): PromptStorage {
+  if (hasProjectStorage()) {
+    return readProjectStorage() ?? getDefaultStorage();
+  }
+  return readStorage();
+}
+
+/** 写入当前活跃层级（与 getActiveLayerStorage 对应） */
+export function writeToActiveLayer(data: PromptStorage): void {
+  if (hasProjectStorage()) {
+    writeProjectStorage(data);
+  } else {
+    writeStorage(data);
+  }
 }
 
 // ============ CRUD 操作 ============
@@ -271,15 +297,9 @@ export function addPrompt(prompt: Omit<Prompt, 'builtin' | 'usageCount' | 'creat
     updatedAt: new Date().toISOString()
   };
 
-  if (hasProjectStorage()) {
-    const project = readProjectStorage() ?? getDefaultStorage();
-    project.prompts.push(newPrompt);
-    writeProjectStorage(project);
-  } else {
-    const user = readStorage();
-    user.prompts.push(newPrompt);
-    writeStorage(user);
-  }
+  const storage = getActiveLayerStorage();
+  storage.prompts.push(newPrompt);
+  writeToActiveLayer(storage);
   return newPrompt;
 }
 
@@ -316,7 +336,7 @@ export function updatePrompt(id: string, updates: Partial<Omit<Prompt, 'id' | 'b
 
 /**
  * 删除提示词
- * 从所在层级删除（若两层都存在则同时删除）
+ * 从所在层级删除（若两层都存在则同时删除），并级联删除其别名
  */
 export function deletePrompt(id: string): boolean {
   const { inUser, inProject } = locatePrompt(id);
@@ -340,25 +360,31 @@ export function deletePrompt(id: string): boolean {
     deleted = true;
   }
 
+  // 级联删除别名（避免留下指向不存在提示词的悬空别名）
+  if (deleted) {
+    removeAliasesByPromptId(id);
+  }
+
   return deleted;
 }
 
 /**
  * 增加使用次数
- * 同时记录最近使用时间（lastUsedAt），供智能排序使用
+ * 同时记录最近使用时间（lastUsedAt），供智能排序使用。
+ * 提示词可能同时存在于两层，两层副本都更新以保持计数一致。
  */
 export function incrementUsage(id: string): void {
   const { inUser, inProject } = locatePrompt(id);
+  const now = new Date().toISOString();
 
   if (inProject && hasProjectStorage()) {
     const project = readProjectStorage()!;
     const prompt = project.prompts.find(p => p.id === id);
     if (prompt) {
       prompt.usageCount = (prompt.usageCount || 0) + 1;
-      prompt.lastUsedAt = new Date().toISOString();
-      prompt.updatedAt = new Date().toISOString();
+      prompt.lastUsedAt = now;
+      prompt.updatedAt = now;
       writeProjectStorage(project);
-      return;
     }
   }
 
@@ -367,8 +393,8 @@ export function incrementUsage(id: string): void {
     const prompt = user.prompts.find(p => p.id === id);
     if (prompt) {
       prompt.usageCount = (prompt.usageCount || 0) + 1;
-      prompt.lastUsedAt = new Date().toISOString();
-      prompt.updatedAt = new Date().toISOString();
+      prompt.lastUsedAt = now;
+      prompt.updatedAt = now;
       writeStorage(user);
     }
   }
@@ -384,18 +410,10 @@ export function addCustomCategory(name: string): void {
     return;
   }
 
-  if (hasProjectStorage()) {
-    const project = readProjectStorage() ?? getDefaultStorage();
-    if (!project.customCategories.includes(name)) {
-      project.customCategories.push(name);
-      writeProjectStorage(project);
-    }
-  } else {
-    const user = readStorage();
-    if (!user.customCategories.includes(name)) {
-      user.customCategories.push(name);
-      writeStorage(user);
-    }
+  const target = getActiveLayerStorage();
+  if (!target.customCategories.includes(name)) {
+    target.customCategories.push(name);
+    writeToActiveLayer(target);
   }
 }
 

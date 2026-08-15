@@ -9,7 +9,7 @@ import * as path from 'path';
 export type StorageLayer = 'user' | 'project';
 
 export interface StorageConfig {
-  /** 用户级存储路径（默认 ~/.deepseek-harness/prompts.user.json） */
+  /** 用户级存储路径（默认由 dshHomePath() 解析，文件 prompts.user.json） */
   userPath?: string;
   /** 项目级存储文件名或相对路径（默认 .harness/prompts.json） */
   projectPath?: string;

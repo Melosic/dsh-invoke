@@ -18,6 +18,7 @@ import {
 } from '../src/storage/manager';
 import { initStorageContext } from '../src/storage/context';
 import type { Prompt, PromptStorage } from '../src/storage/manager';
+import { addAlias, getAllAliases } from '../src/storage/alias-store';
 import { mockFs } from './helpers/mockFs';
 
 jest.mock('@deepseek-ai/dsh-home-paths', () => ({
@@ -268,6 +269,21 @@ describe('project storage (with workspace + merge)', () => {
     expect(getPromptById('p1')).toBeNull();
     expect(readProjectStorage()?.prompts.some(p => p.id === 'p1')).toBe(false);
     expect(readStorage().prompts.some(p => p.id === 'p1')).toBe(false);
+  });
+
+  test('deletePrompt 级联删除别名', () => {
+    addAlias('cascade', 'p1');
+    writeStorage(makeStorage([makePrompt({ id: 'p1' })]));
+    expect(deletePrompt('p1')).toBe(true);
+    expect(getAllAliases().some(a => a.promptId === 'p1')).toBe(false);
+  });
+
+  test('incrementUsage 双层副本同步更新', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'p1', usageCount: 0 })]));
+    writeProjectStorage(makeStorage([makePrompt({ id: 'p1', usageCount: 0 })]));
+    incrementUsage('p1');
+    expect(readStorage().prompts.find(p => p.id === 'p1')?.usageCount).toBe(1);
+    expect(readProjectStorage()?.prompts.find(p => p.id === 'p1')?.usageCount).toBe(1);
   });
 
   test('writeProjectStorage 无工作区时抛错', () => {
