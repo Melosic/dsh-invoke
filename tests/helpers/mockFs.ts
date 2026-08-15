@@ -58,6 +58,10 @@ export const mockFs = {
     files.set(to, content);
     mtimes.set(to, ++mut);
   },
+  unlinkSync: (p: string): void => {
+    if (!files.delete(p)) throw enoent('unlink', p);
+    mtimes.delete(p);
+  },
   /** 供测试检查当前文件系统内容 */
   __files: (): Map<string, string> => files,
   /** 注入下一次 renameSync 失败（原子写入失败路径测试用） */

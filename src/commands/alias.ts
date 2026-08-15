@@ -6,7 +6,7 @@
 
 import { Context } from '@deepseek-ai/cordis';
 import type { CommandResult, CommandInvocation } from '@deepseek-ai/dsh-commands';
-import { getPromptById, incrementUsage } from '../storage/manager.js';
+import { getPromptById, incrementUsage, type Prompt } from '../storage/manager.js';
 import {
   getAllAliases,
   getAlias,
@@ -98,7 +98,7 @@ async function invokeAlias(alias: string, invocation: CommandInvocation): Promis
   const candidates = [entry.promptCwd, cwd].filter(
     (c, i, arr): c is string => !!c?.trim() && arr.indexOf(c) === i
   );
-  let prompt = null as ReturnType<typeof getPromptById>;
+  let prompt: Prompt | null = null;
   let hitCwd = cwd;
   for (const c of candidates) {
     prompt = getPromptById(entry.promptId, c);

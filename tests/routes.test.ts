@@ -56,13 +56,18 @@ function makeRes() {
   };
 }
 
-/** 调用指定路由的 handler 并返回 { status, body } */
+/** 调用指定路由的 handler 并返回 { status, body, raw, req } */
 async function call(
   routePath: string,
   method: string,
   pathname: string,
   opts: ReqOptions = {}
-): Promise<{ status: number; body: Record<string, unknown> | null; raw: string }> {
+): Promise<{
+  status: number;
+  body: Record<string, unknown> | null;
+  raw: string;
+  req: { destroyed: boolean };
+}> {
   const route = captured.find((r) => r.path === routePath);
   if (!route) throw new Error(`route not found: ${routePath}`);
 
@@ -92,7 +97,7 @@ async function call(
   } catch {
     body = null;
   }
-  return { status: res.statusCode, body, raw: res.body };
+  return { status: res.statusCode, body, raw: res.body, req };
 }
 
 // ============ 用例 ============
@@ -158,6 +163,7 @@ describe('安全门', () => {
     const r = await call(PROMPTS, 'POST', '/api/dsh-invoke/prompts', { rawBody: huge });
     expect(r.status).toBe(400);
     expect(String(r.body?.error)).toContain('10MB');
+    expect(r.req.destroyed).toBe(true); // 超限后主动断开连接，不再继续接收
   });
 });
 

@@ -15,8 +15,10 @@ export interface AutoExtractResult {
   values: Record<string, string>;
   /** 自动提取是否可用（编辑器 API 是否存在） */
   available: boolean;
-  /** 提示信息，供 UI 展示 */
-  message: string;
+  /** 提示信息的 i18n key（UI 层渲染时翻译，见 ui/i18n.ts 的 varExtract.*） */
+  messageKey: string;
+  /** 提示信息插值参数 */
+  messageParams?: Record<string, string>;
 }
 
 // ============ 变量类型推断 ============
@@ -78,7 +80,7 @@ export function autoExtractValues(
     return {
       values: {},
       available: true,
-      message: '未选中任何文本，请手动输入'
+      messageKey: 'varExtract.noSelection'
     };
   }
 
@@ -94,7 +96,8 @@ export function autoExtractValues(
       return {
         values,
         available: true,
-        message: `已自动提取选中文本到变量「${variables[0].name}」`
+        messageKey: 'varExtract.wholeContent',
+        messageParams: { name: variables[0].name }
       };
     }
   }
@@ -129,7 +132,7 @@ export function autoExtractValues(
     return {
       values: {},
       available: true,
-      message: '无法从选中文本中自动提取变量，请手动输入'
+      messageKey: 'varExtract.failed'
     };
   }
 
@@ -137,7 +140,8 @@ export function autoExtractValues(
   return {
     values,
     available: true,
-    message: `已自动提取 ${extractedCount} 个变量（${names}）`
+    messageKey: 'varExtract.extracted',
+    messageParams: { count: String(extractedCount), names }
   };
 }
 

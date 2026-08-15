@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Variable } from '../../storage/manager.js';
 import { CopyIcon, CheckIcon, InfoIcon } from '../icons.js';
 import { injectStyles } from '../styles.js';
-import { t } from '../i18n.js';
+import { t, DictKey } from '../i18n.js';
 
 interface VariableDialogProps {
   isOpen: boolean;
@@ -15,7 +15,10 @@ interface VariableDialogProps {
   variables: Variable[];
   initialValues?: Record<string, string>;
   autoExtractValues?: Record<string, string>;
-  extractMessage?: string;
+  /** 自动提取提示的 i18n key（engine/variable-resolver 返回），渲染时翻译 */
+  extractMessageKey?: string;
+  /** 提示插值参数 */
+  extractMessageParams?: Record<string, string>;
 }
 
 export const VariableDialog: React.FC<VariableDialogProps> = ({
@@ -27,7 +30,8 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
   variables,
   initialValues = {},
   autoExtractValues = {},
-  extractMessage = ''
+  extractMessageKey = '',
+  extractMessageParams
 }) => {
   const [values, setValues] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -85,7 +89,11 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
   };
 
   const hasAutoExtract = Object.keys(autoExtractValues).length > 0;
-  const hasExtractMessage = extractMessage.trim().length > 0;
+  const hasExtractMessage = extractMessageKey.trim().length > 0;
+  // key 来自本插件 engine 层的固定枚举，as 收窄是安全的
+  const extractMessage = hasExtractMessage
+    ? t(extractMessageKey as DictKey, extractMessageParams)
+    : '';
 
   if (!isOpen) return null;
 

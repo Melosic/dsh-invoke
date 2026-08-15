@@ -7,17 +7,27 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-/** 确保指定文件的父目录存在 */
+/** 确保指定文件的父目录存在（recursive 幂等，无 existsSync TOCTOU 窗口） */
 function ensureDirFor(filePath: string): void {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+}
+
+/**
+ * 清理残留的 .tmp 孤儿文件：writeFileSync(tmp) 与 renameSync 之间崩溃时留下，
+ * 主文件未受影响故无害，但多次崩溃会累积。写入前顺手清理本路径的旧 .tmp。
+ */
+function cleanupStaleTmp(filePath: string): void {
+  try {
+    fs.unlinkSync(`${filePath}.tmp`);
+  } catch {
+    // 不存在（常态）或清理失败：均不影响本次写入
   }
 }
 
 /** 原子写入 JSON 文件（带 .bak 备份） */
 export function writeJsonAtomic(filePath: string, data: unknown): void {
   ensureDirFor(filePath);
+  cleanupStaleTmp(filePath);
   const tmp = `${filePath}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf-8');
   try {

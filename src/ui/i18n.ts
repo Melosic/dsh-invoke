@@ -66,6 +66,12 @@ const zh = {
   'varDialog.inputPlaceholder': '请输入 {name}',
   'varDialog.noVars': '此提示词没有变量，点击下方按钮直接复制',
 
+  // 变量自动提取（engine/variable-resolver 返回的 messageKey）
+  'varExtract.noSelection': '未选中任何文本，请手动输入',
+  'varExtract.wholeContent': '已自动提取选中文本到变量「{name}」',
+  'varExtract.failed': '无法从选中文本中自动提取变量，请手动输入',
+  'varExtract.extracted': '已自动提取 {count} 个变量（{names}）',
+
   // 删除确认
   'deleteDialog.title': '删除提示词',
   'deleteDialog.message': '确定要删除「{title}」吗？此操作不可撤销。',
@@ -198,6 +204,11 @@ const en: Record<DictKey, string> = {
   'varDialog.required': 'This field is required',
   'varDialog.inputPlaceholder': 'Enter {name}',
   'varDialog.noVars': 'This prompt has no variables. Click the button below to copy directly',
+
+  'varExtract.noSelection': 'No text selected, please enter values manually',
+  'varExtract.wholeContent': 'Selected text auto-filled into variable "{name}"',
+  'varExtract.failed': 'Could not auto-extract variables from the selected text, please enter manually',
+  'varExtract.extracted': 'Auto-filled {count} variable(s) ({names})',
 
   'deleteDialog.title': 'Delete prompt',
   'deleteDialog.message': 'Delete "{title}"? This action cannot be undone.',

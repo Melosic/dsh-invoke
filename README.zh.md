@@ -121,7 +121,7 @@ pnpm add dsh-invoke
 | 描述 | 审查代码中的潜在问题，包括逻辑错误、安全漏洞、性能问题 |
 | 分类 | 开发 |
 | 标签 | `review` `quality` `security` |
-| 正文 | 请审查以下代码，重点关注逻辑错误、安全漏洞、性能问题（含 `{{code}}` 变量） |
+| 正文 | 请审查以下代码，重点关注：1. 逻辑错误 2. 安全漏洞 3. 性能问题（正文以 `{{code}}` 引用代码） |
 | 变量 | `code`（文本输入，必填） |
 
 ## 命令行使用（可选）
@@ -151,6 +151,8 @@ pnpm add dsh-invoke
 - **别名**：用户级 `aliases.json`（全局）
 
 > 注意：项目根目录的解析方式。**命令调用**（`/prompt`、`/prompt-list`、`/<别名>`）中，项目级存储跟随发起调用的会话真实工作目录（`agent.session.header.cwd`）。**HTTP**（`/api/dsh-invoke/*`）支持显式传 `?cwd=`（或 JSON body 中的 `cwd`）；未传时回落到插件加载时捕获的 Host 进程工作目录。`GET /api/dsh-invoke/workspace` 返回解析后的根目录、项目级存储路径，以及该目录是否为已注册的 dsh workspace。导入（merge/overwrite）与新增提示词遵循同一写入层级策略：有工作区写项目级，否则写用户级。
+>
+> 提示词 ID：侧边栏 UI 新建时自动生成 UUID（`crypto.randomUUID`）。HTTP API **不**生成 id——直接 `POST /api/dsh-invoke/prompts` 必须自带唯一 `id`，否则返回 400。
 
 ### 合并策略
 

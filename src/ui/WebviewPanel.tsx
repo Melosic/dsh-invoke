@@ -73,7 +73,10 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
   const [isVarDialogOpen, setIsVarDialogOpen] = useState(false);
   const [varDialogPrompt, setVarDialogPrompt] = useState<Prompt | null>(null);
   const [varDialogAutoExtract, setVarDialogAutoExtract] = useState<Record<string, string>>({});
-  const [varDialogExtractMessage, setVarDialogExtractMessage] = useState('');
+  const [varDialogExtract, setVarDialogExtract] = useState<{
+    key: string;
+    params?: Record<string, string>;
+  } | null>(null);
   const [varDialogVars, setVarDialogVars] = useState<Variable[]>([]);
 
   // 导入对话框状态
@@ -208,7 +211,11 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
     setVarDialogVars(effectiveVars);
     setVarDialogAutoExtract(autoExtract.values);
     setIsVarDialogOpen(true);
-    setVarDialogExtractMessage(autoExtract.message);
+    setVarDialogExtract(
+      autoExtract.messageKey
+        ? { key: autoExtract.messageKey, params: autoExtract.messageParams }
+        : null
+    );
   };
 
   const handleVarDialogConfirm = (values: Record<string, string>) => {
@@ -218,7 +225,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
     setIsVarDialogOpen(false);
     setVarDialogPrompt(null);
     setVarDialogVars([]);
-    setVarDialogExtractMessage('');
+    setVarDialogExtract(null);
   };
 
   // 复制到剪贴板
@@ -579,14 +586,15 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
             setIsVarDialogOpen(false);
             setVarDialogPrompt(null);
             setVarDialogVars([]);
-            setVarDialogExtractMessage('');
+            setVarDialogExtract(null);
           }}
           onConfirm={handleVarDialogConfirm}
           title={varDialogPrompt.title}
           description={t('varDialog.desc')}
           variables={varDialogVars}
           autoExtractValues={varDialogAutoExtract}
-          extractMessage={varDialogExtractMessage}
+          extractMessageKey={varDialogExtract?.key}
+          extractMessageParams={varDialogExtract?.params}
         />
       )}
 

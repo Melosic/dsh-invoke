@@ -121,7 +121,7 @@ The plugin ships with one example prompt, usable directly or as a template:
 | Description | 审查代码中的潜在问题，包括逻辑错误、安全漏洞、性能问题 |
 | Category | 开发 (Development) |
 | Tags | `review` `quality` `security` |
-| Body | 请审查以下代码，重点关注逻辑错误、安全漏洞、性能问题（含 `{{code}}` 变量） |
+| Body | 请审查以下代码，重点关注：1. 逻辑错误 2. 安全漏洞 3. 性能问题（正文以 `{{code}}` 引用代码） |
 | Variable | `code` (text input, required) |
 
 ## Command-Line Usage (Optional)
@@ -151,6 +151,8 @@ Most operations can be done via the sidebar; the command line targets keyboard-d
 - **Aliases**: user-level `aliases.json` (global)
 
 > Note: how the project root is resolved. In **command invocations** (`/prompt`, `/prompt-list`, `/<alias>`), project-level storage follows the invoking session's real working directory (`agent.session.header.cwd`). Over **HTTP** (`/api/dsh-invoke/*`), callers may pass an explicit `?cwd=` (or `cwd` in the JSON body); when omitted it falls back to the Host process working directory captured once at plugin load. `GET /api/dsh-invoke/workspace` reports the resolved root, the project storage path, and whether the directory is a registered dsh workspace. Imports (merge/overwrite) follow the same write-layer policy as creating prompts: project-level when a workspace exists, otherwise user-level.
+>
+> Prompt IDs: the sidebar UI generates UUIDs (`crypto.randomUUID`) when creating prompts. The HTTP API does **not** generate ids — direct `POST /api/dsh-invoke/prompts` calls must supply a unique `id` (400 otherwise).
 
 ### Merge Strategy
 

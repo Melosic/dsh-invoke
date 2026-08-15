@@ -346,12 +346,16 @@ describe('write failure cache consistency', () => {
     expect(getPromptById('ghost')).toBeNull();
     expect(getPromptById('ok')).not.toBeNull();
 
+    // rename 失败残留 .tmp 孤儿，下一次写入前被清理
+    expect(mockFs.__files().has('/workspace/.harness/prompts.json.tmp')).toBe(true);
+
     // 后续成功写入不带幽灵数据落盘
     addPrompt(basePrompt('real'));
     const project = readProjectStorage();
     expect(project?.prompts.some(p => p.id === 'ghost')).toBe(false);
     expect(project?.prompts.some(p => p.id === 'real')).toBe(true);
     expect(project?.prompts.some(p => p.id === 'ok')).toBe(true);
+    expect(mockFs.__files().has('/workspace/.harness/prompts.json.tmp')).toBe(false);
   });
 
   test('updatePrompt 写失败后：内存修改不残留', () => {

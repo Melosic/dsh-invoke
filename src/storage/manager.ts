@@ -114,6 +114,9 @@ function tryParseStorageAt(filePath: string): PromptStorage | null {
 // 每次 API 调用全量读盘 + JSON.parse 两个文件，提示词过千后成为热点。
 // 以「路径 → { mtimeMs, 数据 }」缓存：mtime 未变直接复用解析结果；
 // 本进程写入时同步更新缓存（写穿透），外部修改（mtime 变化）自动失效。
+// 已知局限：缓存键为 mtimeMs。极低分辨率文件系统上（mtime 精确到秒），
+// 同秒内的两次外部写入可能因 mtime 相同而命中旧缓存；主流平台
+// （Linux/Windows/APFS）mtime 均为亚秒精度，实际风险可忽略。
 // 注意：缓存返回的是共享引用，调用方沿用「读 → 改 → 写回」模式即可保持一致，
 // 但不得在不写回的前提下就地修改缓存对象。
 

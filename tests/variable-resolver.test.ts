@@ -47,7 +47,8 @@ describe('autoExtractValues', () => {
     const vars: Variable[] = [{ name: 'code', type: 'text', required: true }];
     const result = autoExtractValues('{{code}}', vars, 'function foo() {}');
     expect(result.values).toEqual({ code: 'function foo() {}' });
-    expect(result.message).toContain('已自动提取');
+    expect(result.messageKey).toBe('varExtract.wholeContent');
+    expect(result.messageParams).toEqual({ name: 'code' });
   });
 
   test('key: value 模式提取', () => {
@@ -65,13 +66,13 @@ describe('autoExtractValues', () => {
   test('未选中文本时提示手动输入', () => {
     const result = autoExtractValues('{{x}}', [{ name: 'x', type: 'text' }], null);
     expect(result.values).toEqual({});
-    expect(result.message).toBe('未选中任何文本，请手动输入');
+    expect(result.messageKey).toBe('varExtract.noSelection');
   });
 
   test('无法提取时返回提示', () => {
     const result = autoExtractValues('{{x}}', [{ name: 'x', type: 'text' }], 'hello world');
     expect(result.values).toEqual({});
-    expect(result.message).toBe('无法从选中文本中自动提取变量，请手动输入');
+    expect(result.messageKey).toBe('varExtract.failed');
   });
 });
 
