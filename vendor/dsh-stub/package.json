@@ -1,7 +1,0 @@
-{
-  "name": "@deepseek-ai/dsh",
-  "version": "0.1.0",
-  "description": "Local stub of @deepseek-ai/dsh for build/dev only. The real package is provided by the DeepSeek Harness runtime.",
-  "types": "index.d.ts",
-  "license": "MIT"
-}

@@ -35,18 +35,18 @@ with sync_playwright() as p:
         id: b.id || null
       }));
 
-      function isNewSessionButton(b) {
+      function isSettingsButton(b) {
         const text = (b.textContent ?? '').trim();
         const label = (b.getAttribute('aria-label') ?? '').trim();
         const haystacks = [text, label].filter(Boolean);
         return haystacks.some(
-          (s) => /new\\s*session/i.test(s) || s.includes('新会话')
+          (s) => /^settings$/i.test(s) || s.includes('设置')
         );
       }
       const anchorCandidates = Array.from(document.querySelectorAll('button')).map(b => ({
         text: (b.textContent||'').trim().slice(0,60),
         ariaLabel: b.getAttribute('aria-label'),
-        match: isNewSessionButton(b)
+        match: isSettingsButton(b)
       }));
 
       const mod = window.__ModuleLoader__;
@@ -56,8 +56,8 @@ with sync_playwright() as p:
         const t = await r.text();
         bundleInfo = {
           size: t.length,
-          hasChineseAnchor: t.includes('新会话'),
-          hasIsNewSessionButton: t.includes('isNewSessionButton'),
+          hasChineseAnchor: t.includes('设置'),
+          hasIsSettingsButton: t.includes('isSettingsButton'),
           hasInjectSidebar: t.includes('injectSidebarButton'),
           hasMutationObserver: t.includes('MutationObserver'),
           headFirst200: t.slice(0, 200)
@@ -83,6 +83,9 @@ with sync_playwright() as p:
       return {
         sidebarBtnExists: !!sidebarBtn,
         sidebarBtnOuterHTML: sidebarBtn ? sidebarBtn.outerHTML.slice(0, 1000) : null,
+        sidebarBtnPositionOk: sidebarBtn
+          ? !!(sidebarBtn.nextElementSibling && isSettingsButton(sidebarBtn.nextElementSibling))
+          : null,
         panelRootExists: !!panelRoot,
         allButtons,
         anchorCandidates: anchorCandidates.slice(0, 15),
