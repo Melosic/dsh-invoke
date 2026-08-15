@@ -9,6 +9,7 @@ import { Context } from '@deepseek-ai/cordis';
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { WebviewPanel } from '../ui/WebviewPanel.js';
+import { injectStyles } from '../ui/styles.js';
 
 export const name = 'dsh-invoke-client';
 export const version = '0.1.0';
@@ -57,6 +58,18 @@ function findSidebarContainer(): HTMLElement | null {
 }
 
 /**
+ * 找到侧边栏导航列表的注入锚点：定位 "New session" 按钮本身，
+ * 入口按钮将插在该按钮之后（New Session 正下方、导航列表顶部），
+ * 保证入口始终落在可视区域内——追加到侧边栏容器末尾会落在视口外。
+ */
+function findNavAnchor(): HTMLElement | null {
+  const btn = Array.from(document.querySelectorAll('button')).find((b) =>
+    /new\s*session/i.test((b.textContent ?? '').trim())
+  );
+  return btn ?? null;
+}
+
+/**
  * 使用 MutationObserver 自愈地在 Harness 侧边栏注入入口按钮。
  * 当 Harness 的侧边栏区域重新渲染时，observer 会自动重新注入。
  */
@@ -64,9 +77,6 @@ function injectSidebarButton(ctx: Context): () => void {
   if (!isBrowserEnv()) return () => {};
 
   const inject = () => {
-    const sidebar = findSidebarContainer();
-    if (!sidebar) return false;
-
     if (document.getElementById(SIDEBAR_BTN_ID)) return true;
 
     const btn = document.createElement('button');
@@ -87,6 +97,16 @@ function injectSidebarButton(ctx: Context): () => void {
     `;
 
     btn.addEventListener('click', () => togglePanel());
+
+    // 优先插入到导航列表（New Session 之后），确保入口在可视区域内；
+    // 找不到锚点时退回追加到侧边栏容器末尾。
+    const anchor = findNavAnchor();
+    if (anchor && anchor.parentElement) {
+      anchor.parentElement.insertBefore(btn, anchor.nextSibling);
+      return true;
+    }
+    const sidebar = findSidebarContainer();
+    if (!sidebar) return false;
     sidebar.appendChild(btn);
     return true;
   };
@@ -133,6 +153,9 @@ function mountPanel() {
 
 export function apply(ctx: Context) {
   console.log('[dsh-invoke-client] 🚀 正在加载侧边栏面板...');
+
+  // 加载时即注入全局样式（幂等），确保侧边栏入口按钮立即可见且有样式
+  injectStyles();
 
   // 注入侧边栏按钮（disposer 在插件卸载时自动断开 observer）
   ctx.effect(() => injectSidebarButton(ctx), 'dsh-invoke.sidebar');
