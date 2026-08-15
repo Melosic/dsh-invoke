@@ -5,6 +5,7 @@ import { Context } from '@deepseek-ai/cordis';
 import type { CommandResult, CommandInvocation } from '@deepseek-ai/dsh-commands';
 import { getSortedPrompts, getAllPrompts } from '../storage/manager.js';
 import { ht } from '../shared/host-messages.js';
+import { debugLog } from '../shared/log.js';
 
 // 导入 @deepseek-ai/dsh-commands 以激活其 declare module 类型增强，
 // 使 ctx.commands 在 Context 上可见（仅类型导入，无运行时副作用）。
@@ -19,7 +20,7 @@ function cwdOf(invocation: CommandInvocation): string | undefined {
  */
 export function registerPromptCommands(ctx: Context): void {
   if (typeof ctx.commands?.register !== 'function') {
-    console.warn('[dsh-invoke] ⚠️ ctx.commands 不可用，跳过命令注册');
+    console.warn('[dsh-invoke] ctx.commands 不可用，跳过命令注册');
     return;
   }
 
@@ -61,5 +62,5 @@ export function registerPromptCommands(ctx: Context): void {
     },
   });
 
-  console.log('[dsh-invoke] ✅ prompt 命令注册完成');
+  debugLog('prompt commands registered');
 }

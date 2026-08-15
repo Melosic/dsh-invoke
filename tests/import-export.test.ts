@@ -191,11 +191,40 @@ describe('原子写入与损坏回退', () => {
   test('主文件损坏时读取回退 .bak 备份', () => {
     writeStorage(makeStorage([makePrompt({ id: 'a' })]));
     writeStorage(makeStorage([makePrompt({ id: 'b' })]));
-    // 模拟崩溃截断
-    mockFs.__files().set('/tmp/dsh-invoke-test/prompts.user.json', '{broken');
+    // 模拟崩溃截断（writeFileSync 会更新 mtime，使读缓存失效）
+    mockFs.writeFileSync('/tmp/dsh-invoke-test/prompts.user.json', '{broken');
 
     const storage = readStorage();
     expect(storage.prompts.map(p => p.id)).toEqual(['a']);
+  });
+});
+
+describe('读缓存', () => {
+  beforeEach(() => mockFs.__reset());
+
+  test('manager 写路径后立即读到最新（写穿透）', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'a' })]));
+    expect(readStorage().prompts.map(p => p.id)).toEqual(['a']);
+    writeStorage(makeStorage([makePrompt({ id: 'b' })]));
+    expect(readStorage().prompts.map(p => p.id)).toEqual(['b']);
+  });
+
+  test('外部修改（mtime 变化）后读到新内容，不返回脏缓存', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'a' })]));
+    expect(readStorage().prompts.map(p => p.id)).toEqual(['a']);
+    // 模拟外部编辑器改写（不经 manager 写路径，但 mtime 变化）
+    mockFs.writeFileSync(
+      '/tmp/dsh-invoke-test/prompts.user.json',
+      JSON.stringify(makeStorage([makePrompt({ id: 'z' })]))
+    );
+    expect(readStorage().prompts.map(p => p.id)).toEqual(['z']);
+  });
+
+  test('文件被删除后读取回退默认存储（缓存失效）', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'a' })]));
+    mockFs.__files().delete('/tmp/dsh-invoke-test/prompts.user.json');
+    const s = readStorage();
+    expect(s.prompts.some(p => p.id === 'code-review')).toBe(true);
   });
 });
 

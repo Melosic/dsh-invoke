@@ -12,6 +12,7 @@ import { WebviewPanel } from '../ui/WebviewPanel.js';
 import { injectStyles } from '../ui/styles.js';
 import { setupI18n } from '../ui/i18n.js';
 import { initApiClient } from './api.js';
+import { debugLog } from '../shared/log.js';
 
 export const name = 'dsh-invoke-client';
 export const version = '0.1.0';
@@ -83,7 +84,7 @@ function tryRegisterSlotEntry(ctx: Context): boolean {
         // slot 入口接管后，DOM 兜底按钮退场（observer 由 disposer 断开）
         document.getElementById(SIDEBAR_BTN_ID)?.remove();
         stopDomFallback();
-        console.log(`${C_LOG_PREFIX} ✅ 已注册到官方 sidebar.footer.action slot`);
+        debugLog('registered into official sidebar.footer.action slot');
       } catch (e) {
         console.warn(`${C_LOG_PREFIX} slot 注册失败，保持 DOM 注入兜底`, e);
       }
@@ -146,10 +147,10 @@ let stopDomFallback: () => void = () => {};
 function injectSidebarButton(ctx: Context): () => void {
   if (!isBrowserEnv()) return () => {};
 
-  /** 打印控制台日志（生产环境也留一份，方便用户排查注入） */
+  /** 打印控制台日志（DSH_INVOKE_DEBUG=1 时输出） */
   const log = (msg: string, arg?: unknown): void => {
     try {
-      if (typeof console !== 'undefined') console.log(`${C_LOG_PREFIX} ${msg}`, arg ?? '');
+      debugLog(msg, arg ?? '');
     } catch {
       /* 忽略 */
     }
@@ -191,7 +192,7 @@ function injectSidebarButton(ctx: Context): () => void {
         log('注入成功：已插入到设置按钮上方');
         return true;
       } catch (e) {
-        log('插入设置按钮前失败，回退 body', e);
+        console.warn(`${C_LOG_PREFIX} 插入设置按钮前失败，回退 body`, e);
       }
     }
 
@@ -256,7 +257,7 @@ function mountPanel() {
 }
 
 export function apply(ctx: Context) {
-  console.log('[dsh-invoke-client] 🚀 正在加载侧边栏面板...');
+  debugLog('loading sidebar panel');
 
   // 注册双语字典到官方 locale 服务（不可用时回退内置 zh）
   setupI18n(ctx);
@@ -276,5 +277,5 @@ export function apply(ctx: Context) {
   tryRegisterSlotEntry(ctx);
   ctx.effect(() => injectSidebarButton(ctx), 'dsh-invoke.sidebar');
 
-  console.log('[dsh-invoke-client] ✅ 侧边栏面板加载完成');
+  debugLog('sidebar panel loaded');
 }

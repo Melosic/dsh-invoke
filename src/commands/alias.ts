@@ -16,6 +16,7 @@ import { renderTemplate } from '../engine/template.js';
 import { resolveVariables } from '../engine/variable-resolver.js';
 import { copyToClipboard } from './clipboard.js';
 import { ht } from '../shared/host-messages.js';
+import { debugLog } from '../shared/log.js';
 
 // ============ 动态命令注册 ============
 
@@ -59,7 +60,7 @@ export function syncAliasCommands(ctx: Context): string[] {
       });
       registeredAliasCommands.set(entry.alias, dispose);
     } catch (e) {
-      console.warn(`[dsh-invoke] ⚠️ 别名命令 /${entry.alias} 注册失败，已跳过`, e);
+      console.warn(`[dsh-invoke] 别名命令 /${entry.alias} 注册失败，已跳过`, e);
       failed.push(entry.alias);
     }
   }
@@ -177,7 +178,7 @@ function usageOf(alias: string, variables: { name: string }[]): string {
 
 export function registerAliasCommands(ctx: Context): void {
   if (typeof ctx.commands?.register !== 'function') {
-    console.warn('[dsh-invoke] ⚠️ ctx.commands 不可用，跳过别名命令注册');
+    console.warn('[dsh-invoke] ctx.commands 不可用，跳过别名命令注册');
     return;
   }
 
@@ -214,5 +215,5 @@ export function registerAliasCommands(ctx: Context): void {
     };
   }, 'dsh-invoke.alias-commands');
 
-  console.log('[dsh-invoke] ✅ alias 命令注册完成');
+  debugLog('alias commands registered');
 }

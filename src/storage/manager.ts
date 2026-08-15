@@ -109,16 +109,49 @@ function tryParseStorageAt(filePath: string): PromptStorage | null {
   }
 }
 
+// ============ 读缓存 ============
+// 每次 API 调用全量读盘 + JSON.parse 两个文件，提示词过千后成为热点。
+// 以「路径 → { mtimeMs, 数据 }」缓存：mtime 未变直接复用解析结果；
+// 本进程写入时同步更新缓存（写穿透），外部修改（mtime 变化）自动失效。
+// 注意：缓存返回的是共享引用，调用方沿用「读 → 改 → 写回」模式即可保持一致，
+// 但不得在不写回的前提下就地修改缓存对象。
+
+interface CacheEntry {
+  mtimeMs: number;
+  data: PromptStorage;
+}
+const storageCache = new Map<string, CacheEntry>();
+
+/** 读取文件 mtime；失败（不存在等）返回 null */
+function mtimeOf(filePath: string): number | null {
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 从指定路径读取存储（不存在则返回空）
  * 主文件损坏时回退 .bak 备份，避免下次写入把唯一可恢复的副本冲掉
  */
 function readStorageAt(filePath: string): PromptStorage | null {
-  if (!fs.existsSync(filePath)) return null;
+  const mtimeMs = mtimeOf(filePath);
+  if (mtimeMs === null) {
+    storageCache.delete(filePath);
+    return null;
+  }
+  const cached = storageCache.get(filePath);
+  if (cached && cached.mtimeMs === mtimeMs) {
+    return cached.data;
+  }
   const parsed = tryParseStorageAt(filePath);
-  if (parsed) return parsed;
+  if (parsed) {
+    storageCache.set(filePath, { mtimeMs, data: parsed });
+    return parsed;
+  }
   console.warn(`[dsh-invoke] 存储文件损坏: ${filePath}，尝试 .bak 备份回退`);
-  return tryParseStorageAt(`${filePath}.bak`);
+  return tryParseStorageAt(`${filePath}.bak`); // 损坏回退属罕见路径，不入缓存
 }
 
 /**
@@ -126,6 +159,13 @@ function readStorageAt(filePath: string): PromptStorage | null {
  */
 function writeStorageAt(filePath: string, data: PromptStorage): void {
   writeJsonAtomic(filePath, data);
+  // 写穿透：同步缓存，避免下一次读重复解析
+  const mtimeMs = mtimeOf(filePath);
+  if (mtimeMs === null) {
+    storageCache.delete(filePath);
+  } else {
+    storageCache.set(filePath, { mtimeMs, data });
+  }
 }
 
 /**
