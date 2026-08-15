@@ -26,58 +26,65 @@ function isBrowserEnv(): boolean {
   return typeof window !== 'undefined' && typeof document !== 'undefined';
 }
 
+/** 中文字符串常量（避免被压缩器混淆成 unicode 转义） */
+const C_SETTINGS = '设置';
+const C_LOG_PREFIX = '[dsh-invoke-client]';
+
 /**
- * 鲁棒地查找 Harness 侧边栏容器。
- * DSH 各版本 DOM 结构不固定（官方无稳定 data-sidebar 锚点），
- * 按优先级尝试：稳定属性 → 模糊 class → 结构回退。
+ * 匹配「设置 / Settings」按钮（兼容中英文文案与 aria-label）。
+ * DSH 中文环境下按钮 text 可能是「设置」，英文环境是 "Settings"。
  */
-function findSidebarContainer(): HTMLElement | null {
-  const selectors = ['[data-sidebar]', '[class*="sidebar" i]', 'aside', 'nav'];
-  for (const sel of selectors) {
-    try {
-      const el = document.querySelector<HTMLElement>(sel);
-      if (el) return el;
-    } catch {
-      /* 忽略无效选择器 */
-    }
-  }
-  // 结构回退：定位包含 "New session" 按钮的容器，向上找到带类名的最外层导航容器
-  const newSessionBtn = Array.from(document.querySelectorAll('button')).find(
-    (b) => /new\s*session/i.test((b.textContent ?? '').trim())
+function isSettingsButton(b: HTMLElement): boolean {
+  const text = (b.textContent ?? '').trim();
+  const label = (b.getAttribute('aria-label') ?? '').trim();
+  const haystacks = [text, label].filter(Boolean);
+  return haystacks.some(
+    (s) => /^settings$/i.test(s) || s.indexOf(C_SETTINGS) !== -1
   );
-  if (newSessionBtn) {
-    let cursor: HTMLElement | null = newSessionBtn.parentElement;
-    let best: HTMLElement | null = null;
-    while (cursor && cursor !== document.body) {
-      if (typeof cursor.className === 'string' && cursor.className.trim()) best = cursor;
-      cursor = cursor.parentElement;
-    }
-    return best;
-  }
-  return null;
 }
 
 /**
- * 找到侧边栏导航列表的注入锚点：定位 "New session" 按钮本身，
- * 入口按钮将插在该按钮之后（New Session 正下方、导航列表顶部），
- * 保证入口始终落在可视区域内——追加到侧边栏容器末尾会落在视口外。
+ * 找到侧边栏「设置」按钮，入口按钮将插在它前面（即设置按钮正上方）。
+ * 找不到时返回 null。
  */
-function findNavAnchor(): HTMLElement | null {
-  const btn = Array.from(document.querySelectorAll('button')).find((b) =>
-    /new\s*session/i.test((b.textContent ?? '').trim())
+function findSettingsButton(): HTMLElement | null {
+  return (
+    Array.from(document.querySelectorAll<HTMLElement>('button')).find((b) =>
+      isSettingsButton(b)
+    ) ?? null
   );
-  return btn ?? null;
 }
 
 /**
  * 使用 MutationObserver 自愈地在 Harness 侧边栏注入入口按钮。
  * 当 Harness 的侧边栏区域重新渲染时，observer 会自动重新注入。
+ *
+ * 注入位置：设置按钮的正上方（insertBefore settings button）。
  */
 function injectSidebarButton(ctx: Context): () => void {
   if (!isBrowserEnv()) return () => {};
 
-  const inject = () => {
-    if (document.getElementById(SIDEBAR_BTN_ID)) return true;
+  /** 打印控制台日志（生产环境也留一份，方便用户排查注入） */
+  const log = (msg: string, arg?: unknown): void => {
+    try {
+      if (typeof console !== 'undefined') console.log(`${C_LOG_PREFIX} ${msg}`, arg ?? '');
+    } catch {
+      /* 忽略 */
+    }
+  };
+
+  const inject = (): boolean => {
+    // 如果按钮已存在，检查位置是否正确（紧挨设置按钮前）；不正确则移除后重插
+    const existing = document.getElementById(SIDEBAR_BTN_ID);
+    if (existing) {
+      const settingsBtn = findSettingsButton();
+      // 正确位置：设置按钮存在 && 按钮的下一个兄弟就是设置按钮
+      if (settingsBtn && existing.nextElementSibling === settingsBtn) {
+        return true; // 位置正确，无需重插
+      }
+      // 位置不对，移除后重新插入
+      existing.remove();
+    }
 
     const btn = document.createElement('button');
     btn.id = SIDEBAR_BTN_ID;
@@ -98,21 +105,27 @@ function injectSidebarButton(ctx: Context): () => void {
 
     btn.addEventListener('click', () => togglePanel());
 
-    // 优先插入到导航列表（New Session 之后），确保入口在可视区域内；
-    // 找不到锚点时退回追加到侧边栏容器末尾。
-    const anchor = findNavAnchor();
-    if (anchor && anchor.parentElement) {
-      anchor.parentElement.insertBefore(btn, anchor.nextSibling);
-      return true;
+    // 找到「设置」按钮，把 Prompt Vault 插在它前面（即设置按钮正上方）
+    const settingsBtn = findSettingsButton();
+    if (settingsBtn && settingsBtn.parentElement) {
+      try {
+        settingsBtn.parentElement.insertBefore(btn, settingsBtn);
+        log('注入成功：已插入到设置按钮上方');
+        return true;
+      } catch (e) {
+        log('插入设置按钮前失败，回退 body', e);
+      }
     }
-    const sidebar = findSidebarContainer();
-    if (!sidebar) return false;
-    sidebar.appendChild(btn);
-    return true;
+
+    // 设置按钮还没渲染出来，暂不追加到 body（等下次重试/observer 再试）
+    // 这样避免在 DOM 未就绪时把按钮放错位置
+    return false;
   };
 
-  // 初次注入
+  // 初次注入（立即 + 两个延迟重试，兼容 Harness 异步挂载侧边栏）
   inject();
+  setTimeout(inject, 500);
+  setTimeout(inject, 2500);
 
   // 自愈：当 DOM 变化时重新注入
   const observer = new MutationObserver(() => {
