@@ -5,6 +5,14 @@ import { Prompt, Variable, addPrompt, updatePrompt } from '../../client/api.js';
 import { injectStyles } from '../styles.js';
 import { t } from '../i18n.js';
 
+/** 生成提示词 ID：优先 crypto.randomUUID（同毫秒并发也不冲突），降级随机拼合 */
+function generatePromptId(): string {
+  const c = globalThis.crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  // 降级：随机数 + 时间戳（非安全上下文无 randomUUID 时）
+  return `prompt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 interface PromptFormModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -100,7 +108,7 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
     }
 
     const cleanVariables = variables.filter(v => v.name.trim() !== '');
-    const id = isEditMode ? editPrompt!.id : `prompt-${Date.now()}`;
+    const id = isEditMode ? editPrompt!.id : generatePromptId();
 
     const promptData = {
       id,

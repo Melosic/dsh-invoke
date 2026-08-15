@@ -131,11 +131,23 @@ function serverError(res: ServerResponse, error: unknown): void {
   json(res, 500, { error: error instanceof Error ? error.message : 'Internal Server Error' });
 }
 
-/** 读取并解析 JSON 请求体 */
+/** 请求体大小上限（导入文件等场景足够，防异常超大包占用内存） */
+const MAX_BODY_BYTES = 10 * 1024 * 1024;
+
+/** 读取并解析 JSON 请求体（超过上限拒绝） */
 function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    let size = 0;
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        req.destroy();
+        reject(new Error('请求体过大（上限 10MB）'));
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => {
       try {
         const raw = Buffer.concat(chunks).toString('utf-8');
@@ -337,7 +349,13 @@ export function registerRoutes(ctx: Context): () => void {
           }
 
           const entry = addAlias(body.alias, body.promptId);
-          syncAliasCommands(ctx);
+          const failed = syncAliasCommands(ctx);
+          if (failed.length > 0) {
+            return json(res, 201, {
+              ...entry,
+              warning: `别名已保存，但命令 /${entry.alias} 注册失败（可能与其他命令重名），请换一个别名`
+            });
+          }
           return json(res, 201, entry);
         } catch (error) {
           return error instanceof Error

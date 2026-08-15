@@ -25,9 +25,14 @@ const registeredAliasCommands = new Map<string, () => void>();
  * 将别名存储中的变更同步到命令注册表：
  * 新增别名 → 注册 /<别名> 命令；删除别名 → 注销对应命令。
  * 幂等，可在任意变更后重复调用。
+ *
+ * 单条注册失败（如与其他插件命令撞名）只跳过该条，不中断整个同步，
+ * 避免存储已写入但命令表只同步了一半的永久不一致。
+ *
+ * @returns 注册失败的别名列表（供调用方在响应中提示）
  */
-export function syncAliasCommands(ctx: Context): void {
-  if (typeof ctx.commands?.register !== 'function') return;
+export function syncAliasCommands(ctx: Context): string[] {
+  if (typeof ctx.commands?.register !== 'function') return [];
 
   const aliases = getAllAliases();
   const wanted = new Set(aliases.map(a => a.alias));
@@ -40,17 +45,24 @@ export function syncAliasCommands(ctx: Context): void {
     }
   }
 
-  // 注册新增的别名命令
+  // 注册新增的别名命令（失败条目跳过，下一轮 sync 仍会重试）
+  const failed: string[] = [];
   for (const entry of aliases) {
     if (registeredAliasCommands.has(entry.alias)) continue;
-    const dispose = ctx.commands.register({
-      name: entry.alias,
-      description: `提示词别名 → ${describePromptTitle(entry)}`,
-      input: { hint: '跟在命令后的内容，用于填充提示词变量' },
-      handler: (invocation) => invokeAlias(entry.alias, invocation),
-    });
-    registeredAliasCommands.set(entry.alias, dispose);
+    try {
+      const dispose = ctx.commands.register({
+        name: entry.alias,
+        description: `提示词别名 → ${describePromptTitle(entry)}`,
+        input: { hint: '跟在命令后的内容，用于填充提示词变量' },
+        handler: (invocation) => invokeAlias(entry.alias, invocation),
+      });
+      registeredAliasCommands.set(entry.alias, dispose);
+    } catch (e) {
+      console.warn(`[dsh-invoke] ⚠️ 别名命令 /${entry.alias} 注册失败，已跳过`, e);
+      failed.push(entry.alias);
+    }
   }
+  return failed;
 }
 
 function describePromptTitle(entry: AliasEntry): string {
