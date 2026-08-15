@@ -19,12 +19,13 @@ The plugin runs as a **Host + Client two-part plugin**: the Host side (Node) reg
 - **Light / dark theme**: follows Harness's `data-ds-dark-theme` mechanism automatically, with in-panel manual override.
 - **Two-layer storage merge**: user-level global storage + project-level storage, project-level wins.
 - **Import / export**: batch JSON / YAML import (merge / overwrite modes), export backup.
-- **Full command-line support**: `/prompt`, `/prompt-list`, `/alias` commands.
+- **Full command-line support**: `/prompt`, `/prompt-list`, `/alias` commands, plus `/<alias> [content]` quick invocation.
+- **Alias quick invocation**: bind an alias to a prompt, then `/<alias> content` renders and copies it in one step (variables auto-filled; conflict detection and cascade delete included).
 - **Usage stats & smart sorting**: ranked by a composite score of usage frequency and recency.
 
 ## Requirements
 
-- Node.js >= 18.x
+- Node.js >= 22.19 (follows the DeepSeek Harness engine requirement)
 - DeepSeek Harness >= 0.1.0, < 0.2.0
 
 ## Installation
@@ -132,11 +133,24 @@ Most operations can be done via the sidebar; the command line targets keyboard-d
 | `/prompt` | List all prompts (with category, built-in marker, description) |
 | `/prompt-list` | List all prompts grouped by category |
 | `/alias` | List all registered aliases and the prompts they point to |
+| `/<alias> [content]` | Invoke the aliased prompt: renders it and copies to the clipboard |
+
+### Alias System
+
+- Open the alias dialog via the link-icon action on a prompt card (or by clicking the alias badge on the card). Each prompt can be bound to one alias.
+- Alias rules: lowercase letters / digits / hyphens; must not collide with reserved commands (`prompt`, `prompt-list`, `alias`, `help`, `clear`, `exit`) or existing aliases. Validated server-side.
+- Invocation: `/<alias> content` — the text after the command fills the template variables. A **single-variable** prompt receives the whole text; a **multi-variable** prompt splits it in declaration order using `||`. Missing required variables produce a usage hint.
+- On success the rendered prompt is copied to the system clipboard (when the clipboard is unavailable, the body is echoed for manual copy) and the usage counter increments.
+- Deleting a prompt cascades to delete its alias.
+- Alias data lives in the user-level `aliases.json` (global, not workspace-scoped).
 
 ## Data Storage
 
 - **User-level (writable)**: `~/.dsh/prompts.user.json` (resolved via `@deepseek-ai/dsh-home-paths`)
-- **Project-level (writable, higher priority)**: `.harness/prompts.json` (under the currently open workspace root)
+- **Project-level (writable, higher priority)**: `.harness/prompts.json`
+- **Aliases**: user-level `aliases.json` (global)
+
+> Note: the project-level path is resolved from the Host process working directory (`process.cwd()`) once at plugin load; switching workspaces at runtime does not refresh it. Imports (merge/overwrite) follow the same write-layer policy as creating prompts: project-level when a workspace exists, otherwise user-level.
 
 ### Merge Strategy
 
@@ -207,14 +221,15 @@ dsh-invoke/
 │   │   └── api.ts          # fetch API wrapper
 │   ├── storage/
 │   │   ├── context.ts      # storage context (workspace/path config)
-│   │   └── manager.ts      # two-layer merge + CRUD + smart sorting
+│   │   ├── manager.ts      # two-layer merge + CRUD + smart sorting
+│   │   └── alias-store.ts  # alias storage (CRUD + conflict detection + cascade delete)
 │   ├── engine/
 │   │   ├── template.ts     # variable substitution ({{var}})
 │   │   ├── variable-resolver.ts  # variable extraction (experimental)
 │   │   └── import-export.ts  # JSON / YAML import-export
 │   ├── commands/
 │   │   ├── prompt.ts       # main command registration
-│   │   ├── alias.ts        # alias management & conflict detection
+│   │   ├── alias.ts        # /alias listing + dynamic /<alias> command registration & invocation
 │   │   └── clipboard.ts    # cross-platform clipboard copy (Node child_process)
 │   └── ui/
 │       ├── theme.ts        # theme adaptation (light/dark)

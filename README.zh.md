@@ -19,12 +19,13 @@ dsh-invoke 是 DeepSeek Harness 的社区插件，专注于提示词的管理与
 - **亮 / 暗主题自适应**：跟随 Harness 的 `data-ds-dark-theme` 机制自动切换，支持面板内手动覆盖
 - **双层存储合并**：用户级全局存储 + 项目级存储，项目级优先级更高
 - **导入 / 导出**：JSON / YAML 批量导入（合并 / 覆盖两种模式）、导出备份
-- **命令行完整支持**：`/prompt`、`/prompt-list`、`/alias` 命令
+- **命令行完整支持**：`/prompt`、`/prompt-list`、`/alias` 命令，以及 `/<别名> [内容]` 快捷调用
+- **别名快捷调用**：为提示词绑定别名后，`/<别名> 内容` 一键渲染并复制（变量自动填充，含冲突检测与级联删除）
 - **使用统计与智能排序**：基于使用频次与最近使用时间的综合得分排序
 
 ## 环境要求
 
-- Node.js >= 18.x
+- Node.js >= 22.19（跟随 DeepSeek Harness 的引擎要求）
 - DeepSeek Harness >= 0.1.0，< 0.2.0
 
 ## 安装
@@ -132,11 +133,24 @@ pnpm add dsh-invoke
 | `/prompt` | 列出所有提示词（含分类、内置标记、描述） |
 | `/prompt-list` | 按分类分组列出所有提示词 |
 | `/alias` | 列出所有已注册别名及其指向的提示词 |
+| `/<别名> [内容]` | 快速调用别名指向的提示词：渲染后复制到剪贴板 |
+
+### 别名系统
+
+- 在提示词卡片的「设置别名」按钮（链接图标）或别名徽标上打开设置弹窗，一个提示词可绑定一个别名。
+- 别名规则：小写字母/数字/连字符，不能与保留命令（`prompt` / `prompt-list` / `alias` / `help` / `clear` / `exit`）或其他别名冲突，服务端统一校验。
+- 调用规则：`/<别名> 内容` —— 命令后的文本用于填充变量；**单变量**提示词整个内容填入，**多变量**提示词按声明顺序用 `||` 分隔；缺少必填变量时会提示用法。
+- 调用成功后渲染结果复制到系统剪贴板（剪贴板不可用时直接回显正文供手动复制），并累计使用次数。
+- 删除提示词时自动级联删除其别名。
+- 别名数据存储于用户级 `aliases.json`（不区分工作区）。
 
 ## 数据存储
 
 - **用户级（可写）**：`~/.dsh/prompts.user.json`（由 `@deepseek-ai/dsh-home-paths` 解析）
-- **项目级（可写，优先级高）**：`.harness/prompts.json`（当前打开工作区根目录下）
+- **项目级（可写，优先级高）**：`.harness/prompts.json`
+- **别名**：用户级 `aliases.json`（全局）
+
+> 注意：项目级路径基于 Host 进程的工作目录（`process.cwd()`），在插件加载时解析一次；运行中切换工作区不会自动更新。导入（merge/overwrite）与新增提示词遵循同一写入层级策略：有工作区写项目级，否则写用户级。
 
 ### 合并策略
 
@@ -207,14 +221,15 @@ dsh-invoke/
 │   │   └── api.ts          # fetch API 封装
 │   ├── storage/
 │   │   ├── context.ts      # 存储上下文（工作区/路径配置）
-│   │   └── manager.ts      # 双层合并 + CRUD + 智能排序
+│   │   ├── manager.ts      # 双层合并 + CRUD + 智能排序
+│   │   └── alias-store.ts  # 别名存储（CRUD + 冲突检测 + 级联删除）
 │   ├── engine/
 │   │   ├── template.ts     # 变量替换（{{var}}）
 │   │   ├── variable-resolver.ts  # 变量提取（含实验性自动提取）
 │   │   └── import-export.ts  # JSON / YAML 导入导出
 │   ├── commands/
 │   │   ├── prompt.ts       # 主命令注册
-│   │   ├── alias.ts        # 别名管理与冲突检测
+│   │   ├── alias.ts        # /alias 列表 + /<别名> 动态命令注册与调用链
 │   │   └── clipboard.ts    # 跨平台剪贴板复制（Node child_process）
 │   └── ui/
 │       ├── theme.ts        # 主题适配（亮/暗色）
