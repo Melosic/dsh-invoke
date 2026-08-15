@@ -20,6 +20,14 @@ import {
   type PromptSortMode,
 } from '../storage/manager.js';
 import {
+  getAllAliases,
+  getAliasByPromptId,
+  addAlias,
+  removeAlias,
+  normalizeAliasInput,
+} from '../storage/alias-store.js';
+import { syncAliasCommands } from '../commands/alias.js';
+import {
   exportToJSON,
   exportToYAML,
   importFromJSON,
@@ -179,7 +187,64 @@ export function registerRoutes(ctx: Context): () => void {
 
       if (req.method === 'DELETE') {
         const deleted = deletePrompt(id);
+        // deletePrompt 级联删除了该提示词的别名，此处同步注销对应命令
+        if (deleted) syncAliasCommands(ctx);
         return json(res, 200, { success: deleted });
+      }
+
+      return notFound(res);
+    },
+  });
+
+  // ---- 别名：列表 / 新增 / 删除 ----
+  // 别名数据全局存储于用户级 aliases.json（不区分工作区）
+
+  add({
+    kind: 'exact',
+    path: `${API_BASE}/aliases`,
+    handler: async (req, res) => {
+      const url = new URL(req.url ?? '/', 'http://localhost');
+
+      if (req.method === 'GET') {
+        return json(res, 200, { aliases: getAllAliases() });
+      }
+
+      if (req.method === 'POST') {
+        try {
+          const body = (await readJsonBody(req)) as { alias?: string; promptId?: string };
+          if (!body.alias || !body.promptId) {
+            return badRequest(res, '缺少必填字段（alias / promptId）');
+          }
+          if (!getPromptById(body.promptId)) {
+            return badRequest(res, `提示词 ID「${body.promptId}」不存在`);
+          }
+
+          // upsert 语义：一个提示词一个别名，重设时替换旧别名
+          const normalized = normalizeAliasInput(body.alias);
+          const existing = getAliasByPromptId(body.promptId);
+          if (existing) {
+            if (existing.alias === normalized) {
+              return json(res, 200, existing); // 未变化
+            }
+            removeAlias(existing.alias);
+          }
+
+          const entry = addAlias(body.alias, body.promptId);
+          syncAliasCommands(ctx);
+          return json(res, 201, entry);
+        } catch (error) {
+          return error instanceof Error
+            ? badRequest(res, error.message)
+            : serverError(res, error);
+        }
+      }
+
+      if (req.method === 'DELETE') {
+        const name = url.searchParams.get('name');
+        if (!name) return badRequest(res, '缺少别名（?name=）');
+        const removed = removeAlias(name);
+        if (removed) syncAliasCommands(ctx);
+        return json(res, 200, { success: removed });
       }
 
       return notFound(res);

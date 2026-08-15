@@ -121,6 +121,38 @@ export async function removeCustomCategory(name: string): Promise<void> {
   );
 }
 
+// ============ 别名 ============
+
+export interface AliasEntry {
+  /** 别名（不含开头的 /，小写） */
+  alias: string;
+  /** 关联的提示词 ID */
+  promptId: string;
+  /** 创建时间 */
+  createdAt: string;
+}
+
+/** 获取所有别名 */
+export async function getAllAliases(): Promise<AliasEntry[]> {
+  const data = await request<{ aliases: AliasEntry[] }>('/aliases');
+  return data.aliases;
+}
+
+/** 为提示词设置别名（若该提示词已有别名，将报错，需先删除） */
+export async function addAlias(alias: string, promptId: string): Promise<AliasEntry> {
+  return request<AliasEntry>('/aliases', {
+    method: 'POST',
+    body: JSON.stringify({ alias, promptId }),
+  });
+}
+
+/** 删除别名 */
+export async function removeAlias(alias: string): Promise<void> {
+  await request<{ success: boolean }>(`/aliases?name=${encodeURIComponent(alias)}`, {
+    method: 'DELETE',
+  });
+}
+
 // ============ 导入 / 导出 ============
 
 export interface ImportResult {
