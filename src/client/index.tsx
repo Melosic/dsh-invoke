@@ -1,4 +1,4 @@
-// src/client/index.ts
+// src/client/index.tsx
 // dsh-invoke 浏览器端入口
 // 职责：
 //   1. 通过 DOM 注入侧边栏入口按钮（DSH 暂无官方 sidebar 扩展 slot）
@@ -57,8 +57,73 @@ function findSettingsButton(): HTMLElement | null {
 }
 
 /**
- * 使用 MutationObserver 自愈地在 Harness 侧边栏注入入口按钮。
- * 当 Harness 的侧边栏区域重新渲染时，observer 会自动重新注入。
+ * slot 化入口：注册到官方侧边栏的 sidebar.footer.action（kind: list）。
+ * 返回 true 表示已进入等待/注册流程（无论 slot 是否已声明）；
+ * 返回 false 表示宿主无 slots 服务（旧版 Harness），调用方走 DOM 兜底。
+ *
+ * 注意：slot 未声明时 register 会同步 throw，所以用 slots.inject() 等待
+ * 声明提交后再注册（官方跨插件加载顺序机制）；全程 try/catch，
+ * 任何失败都静默降级到 DOM 注入方案。
+ */
+function tryRegisterSlotEntry(ctx: Context): boolean {
+  const slots = (ctx as { slots?: SlotsService }).slots;
+  if (!slots || typeof slots.inject !== 'function' || typeof slots.register !== 'function') {
+    return false;
+  }
+  try {
+    slots.inject('sidebar.footer.action', () => {
+      try {
+        slots.register(
+          { name: 'sidebar.footer.action', id: 'dsh-invoke', order: 10, label: 'Prompt Vault' },
+          SidebarEntryButton
+        );
+        // slot 入口接管后，DOM 兜底按钮退场（observer 由 disposer 断开）
+        document.getElementById(SIDEBAR_BTN_ID)?.remove();
+        stopDomFallback();
+        console.log(`${C_LOG_PREFIX} ✅ 已注册到官方 sidebar.footer.action slot`);
+      } catch (e) {
+        console.warn(`${C_LOG_PREFIX} slot 注册失败，保持 DOM 注入兜底`, e);
+      }
+    });
+    return true;
+  } catch (e) {
+    console.warn(`${C_LOG_PREFIX} slots.inject 不可用，走 DOM 注入兜底`, e);
+    return false;
+  }
+}
+
+/** slots 服务的最小运行时接口（类型层 SlotMap 未合并进编译图，按结构探测） */
+interface SlotsService {
+  inject(key: string, callback: () => void): unknown;
+  register<P>(options: { name: string; id: string; order?: number; label?: string }, component: React.ComponentType<P>): unknown;
+}
+
+/** slot 入口按钮的 props（官方 sidebar 渲染时注入 wide） */
+interface SidebarEntryProps {
+  wide?: boolean;
+}
+
+/** 官方侧边栏 footer slot 入口按钮：28×28 圆钮（wide）/ 36×36（折叠 rail） */
+const SidebarEntryButton: React.FC<SidebarEntryProps> = ({ wide }) => (
+  <button
+    type="button"
+    className={`dsh-invoke-slot-btn${wide ? '' : ' rail'}`}
+    aria-label="Prompt Vault"
+    title="Prompt Vault"
+    onClick={() => togglePanel()}
+  >
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path fill="currentColor" fillRule="evenodd" clipRule="evenodd" d="M8.5 1H3.5a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5V5.5L8.5 1zM8.5 2.2v2.8h2.8L8.5 2.2zM5.5 8h5v1h-5V8zm0 2.5h5v1h-5v-1z" />
+    </svg>
+  </button>
+);
+
+/** DOM 兜底的退出钩子（slot 注册成功时调用） */
+let stopDomFallback: () => void = () => {};
+
+/**
+ * 使用 MutationObserver 自愈地在 Harness 侧边栏注入入口按钮（DOM 兜底方案）。
+ * 官方 slot 可用时会自动退场；当 Harness 的侧边栏区域重新渲染时，observer 会自动重新注入。
  *
  * 注入位置：设置按钮的正上方（insertBefore settings button）。
  */
@@ -132,7 +197,12 @@ function injectSidebarButton(ctx: Context): () => void {
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
-  return () => observer.disconnect();
+  const dispose = () => {
+    observer.disconnect();
+    document.getElementById(SIDEBAR_BTN_ID)?.remove();
+  };
+  stopDomFallback = dispose;
+  return dispose;
 }
 
 /** 隐藏面板（保留 DOM 与 React 状态，便于再次打开） */
@@ -178,7 +248,12 @@ export function apply(ctx: Context) {
   // 加载时即注入全局样式（幂等），确保侧边栏入口按钮立即可见且有样式
   injectStyles();
 
-  // 注入侧边栏按钮（disposer 在插件卸载时自动断开 observer）
+  // 入口策略：优先官方 sidebar.footer.action slot；DOM 注入兜底并行运行，
+  // slot 注册成功后自动退场（stopDomFallback）。覆盖三种情形：
+  //   1. 无 slots 服务（旧版宿主）→ 仅 DOM 兜底
+  //   2. slot 已声明/稍后声明 → slot 接管，DOM 兜底退场
+  //   3. slots 服务存在但 slot 永不声明 → DOM 兜底持续工作
+  tryRegisterSlotEntry(ctx);
   ctx.effect(() => injectSidebarButton(ctx), 'dsh-invoke.sidebar');
 
   console.log('[dsh-invoke-client] ✅ 侧边栏面板加载完成');

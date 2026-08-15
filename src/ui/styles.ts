@@ -54,33 +54,34 @@ export function injectStyles(): void {
   --ds-50: rgb(237,243,254);
   --ds-100: rgb(228,237,253);
 
-  /* 语义色 */
-  --red-600: rgb(220,38,38);
+  /* 语义色（状态色挂接官方 token，跟随宿主主题）*/
+  --red-600: var(--dsw-alias-state-error-primary, rgb(220,38,38));
   --red-50: rgb(254,242,242);
-  --green-500: rgb(34,197,94);
+  --green-500: var(--dsw-alias-state-success-primary, rgb(34,197,94));
 
   /* 别名 - 背景 */
   --pv-bg-base: var(--nb-50);        /* 容器微灰，让卡片浮起 */
   --pv-bg-layer: var(--nb-60);
   --pv-bg-card: var(--nb-00);        /* 卡片纯白 */
   --pv-bg-input: var(--nb-60);
-  --pv-bg-hover: rgba(38,49,72,0.06);
+  --pv-bg-hover: var(--dsw-alias-interactive-bg-hover, rgba(38,49,72,0.06));
   --pv-bg-active: rgba(38,49,72,0.1);
   --pv-bg-mask: rgba(0,0,0,0.24);
   --pv-bg-tag: var(--nb-100);
   --pv-bg-toast: var(--nb-800);
   --pv-bg-modal: var(--nb-00);
 
-  /* 别名 - 文字 */
+  /* 别名 - 文字（secondary/tertiary 挂官方 label token；
+     primary 保持自定，确保面板底色上的可读性不受宿主配色影响）*/
   --pv-text-primary: var(--nb-1000);
-  --pv-text-secondary: var(--nb-700);
-  --pv-text-tertiary: var(--nb-600);
+  --pv-text-secondary: var(--dsw-alias-label-secondary, var(--nb-700));
+  --pv-text-tertiary: var(--dsw-alias-label-tertiary, var(--nb-600));
   --pv-text-caption: var(--nb-400);
   --pv-text-on-primary: var(--nb-00);
 
-  /* 别名 - 边框（Harness 用极淡半透明）*/
+  /* 别名 - 边框（Harness 用极淡半透明；border-2 挂官方 l2）*/
   --pv-border-1: rgba(0,0,0,0.04);
-  --pv-border-2: rgba(0,0,0,0.1);
+  --pv-border-2: var(--dsw-alias-border-l2, rgba(0,0,0,0.1));
   --pv-border-3: rgba(0,0,0,0.12);
 
   /* 别名 - 品牌（Harness 主按钮是近黑，不是蓝）*/
@@ -104,12 +105,12 @@ export function injectStyles(): void {
   --pv-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --pv-font-mono: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, Menlo, monospace;
 
-  /* 动效（对齐 Harness：.16s 入场 + 标准缓动）*/
-  --pv-ease: cubic-bezier(.4, 0, .2, 1);
+  /* 动效（时长/缓动对齐官方 150ms/300ms + --ds-ease-in-out）*/
+  --pv-ease: var(--ds-ease-in-out, cubic-bezier(.4, 0, .2, 1));
   --pv-ease-out: cubic-bezier(0, 0, .2, 1);
   --pv-dur-fast: .1s;
-  --pv-dur: .16s;
-  --pv-dur-slow: .24s;
+  --pv-dur: .15s;
+  --pv-dur-slow: .3s;
 }
 
 /* ============ 暗色主题 ============ */
@@ -120,7 +121,7 @@ body[data-ds-dark-theme] #dsh-invoke-root,
   --pv-bg-layer: var(--nb-900);
   --pv-bg-card: var(--nb-875);
   --pv-bg-input: var(--nb-850);
-  --pv-bg-hover: rgba(255,255,255,0.08);
+  --pv-bg-hover: var(--dsw-alias-interactive-bg-hover, rgba(255,255,255,0.08));
   --pv-bg-active: rgba(255,255,255,0.14);
   --pv-bg-mask: rgba(0,0,0,0.5);
   --pv-bg-tag: var(--nb-800);
@@ -128,13 +129,13 @@ body[data-ds-dark-theme] #dsh-invoke-root,
   --pv-bg-modal: var(--nb-850);
 
   --pv-text-primary: var(--nb-50);
-  --pv-text-secondary: var(--nb-300);
-  --pv-text-tertiary: var(--nb-400);
+  --pv-text-secondary: var(--dsw-alias-label-secondary, var(--nb-300));
+  --pv-text-tertiary: var(--dsw-alias-label-tertiary, var(--nb-400));
   --pv-text-caption: var(--nb-600);
   --pv-text-on-primary: var(--nb-1000);
 
   --pv-border-1: rgba(255,255,255,0.06);
-  --pv-border-2: rgba(255,255,255,0.12);
+  --pv-border-2: var(--dsw-alias-border-l2, rgba(255,255,255,0.12));
   --pv-border-3: rgba(255,255,255,0.16);
 
   --pv-brand: var(--nb-50);
@@ -1016,7 +1017,7 @@ body[data-ds-dark-theme] #dsh-invoke-root,
 }
 
 /* ============ 侧边栏入口按钮（全局，位于 #dsh-invoke-root 之外） ============ */
-/* 不使用 pv token（其作用域为 #dsh-invoke-root），颜色独立定义并跟随 body 暗色主题 */
+/* 不使用 pv token（其作用域为 #dsh-invoke-root），颜色优先消费官方 --dsw-alias-* */
 .dsh-invoke-sidebar-btn {
   display: flex;
   align-items: center;
@@ -1027,7 +1028,7 @@ body[data-ds-dark-theme] #dsh-invoke-root,
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--ds-invoke-sb-text, #5c6370);
+  color: var(--ds-invoke-sb-text, var(--dsw-alias-label-secondary, #5c6370));
   font-family: inherit;
   font-size: 13px;
   line-height: 1;
@@ -1036,17 +1037,54 @@ body[data-ds-dark-theme] #dsh-invoke-root,
   transition: background 0.15s ease, color 0.15s ease;
 }
 .dsh-invoke-sidebar-btn:hover {
-  background: var(--ds-invoke-sb-hover, rgba(128, 128, 128, 0.12));
-  color: var(--ds-invoke-sb-text-active, #1a1a1a);
+  background: var(--ds-invoke-sb-hover, var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.12)));
+  color: var(--ds-invoke-sb-text-active, var(--dsw-alias-label-primary, #1a1a1a));
 }
 .dsh-invoke-sidebar-btn svg { flex: none; }
 .dsh-invoke-sidebar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 body[data-ds-dark-theme="true"] .dsh-invoke-sidebar-btn,
 body[data-ds-dark-theme] .dsh-invoke-sidebar-btn {
-  --ds-invoke-sb-text: #9aa0aa;
-  --ds-invoke-sb-text-active: #e6e6e6;
-  --ds-invoke-sb-hover: rgba(255, 255, 255, 0.08);
+  --ds-invoke-sb-text: var(--dsw-alias-label-secondary, #9aa0aa);
+  --ds-invoke-sb-text-active: var(--dsw-alias-label-primary, #e6e6e6);
+  --ds-invoke-sb-hover: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.08));
+}
+
+/* ============ 官方 sidebar.footer.action slot 入口按钮 ============ */
+/* 规格对齐官方 iconButton：wide 28×28 圆钮，折叠 rail 36×36；颜色消费官方 alias token */
+.dsh-invoke-slot-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #5c6370);
+  cursor: pointer;
+  transition: background 0.15s var(--ds-ease-in-out, ease), color 0.15s var(--ds-ease-in-out, ease);
+}
+.dsh-invoke-slot-btn:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.12));
+  color: var(--dsw-alias-label-primary, #1a1a1a);
+}
+.dsh-invoke-slot-btn.rail {
+  width: 36px;
+  height: 36px;
+  color: var(--dsw-alias-label-primary, #5c6370);
+}
+.dsh-invoke-slot-btn:focus-visible {
+  outline: 2px solid var(--dsw-alias-label-primary, #1a1a1a);
+  outline-offset: 1px;
+}
+.dsh-invoke-slot-btn svg { flex: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dsh-invoke-slot-btn { transition: none; }
 }
 `;
   document.head.appendChild(style);

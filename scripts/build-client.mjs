@@ -20,7 +20,7 @@ const PLATFORM_MODULES = [
 ];
 
 await build({
-  entryPoints: ['src/client/index.ts'],
+  entryPoints: ['src/client/index.tsx'],
   bundle: true,
   format: 'cjs',
   platform: 'browser',

@@ -1,8 +1,9 @@
 // src/ui/icons.tsx
 
 /**
- * Feather Icons 内联 SVG 组件
- * 所有图标以纯 SVG 方式导出，无需额外网络请求
+ * 内联 SVG 图标组件
+ * 头部高频图标（Plus/Moon/Sun/X）为 16px 填充式（对齐官方 ic_ds_* 风格），
+ * 其余为 Feather 描边式；全部纯 SVG 内联，无网络请求
  */
 
 import React from 'react';
@@ -35,6 +36,28 @@ const IconBase: React.FC<{
   </svg>
 );
 
+/**
+ * 填充式图标基座（对齐官方 ic_ds_* 16px 风格）
+ * viewBox 16、fill=currentColor，通过正片叠底形状相减（fill-rule）实现镂空
+ */
+const FillBase: React.FC<{
+  children: React.ReactNode;
+  size?: number;
+  className?: string;
+}> = ({ children, size = 16, className = '' }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 16 16"
+    fill="currentColor"
+    aria-hidden="true"
+    className={className}
+  >
+    {children}
+  </svg>
+);
+
 export const SearchIcon: React.FC<IconProps> = (props) => (
   <IconBase {...props}>
     <circle cx="11" cy="11" r="8" />
@@ -42,11 +65,10 @@ export const SearchIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
-export const PlusIcon: React.FC<IconProps> = (props) => (
-  <IconBase {...props}>
-    <line x1="12" y1="5" x2="12" y2="19" />
-    <line x1="5" y1="12" x2="19" y2="12" />
-  </IconBase>
+export const PlusIcon: React.FC<IconProps> = ({ size, className }) => (
+  <FillBase size={size} className={className}>
+    <path d="M8 2.2c.5 0 .9.4.9.9v4h4a.9.9 0 1 1 0 1.8h-4v4a.9.9 0 1 1-1.8 0v-4h-4a.9.9 0 1 1 0-1.8h4v-4c0-.5.4-.9.9-.9z" />
+  </FillBase>
 );
 
 export const EditIcon: React.FC<IconProps> = (props) => (
@@ -97,24 +119,17 @@ export const ChevronDownIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
-export const MoonIcon: React.FC<IconProps> = (props) => (
-  <IconBase {...props}>
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-  </IconBase>
+export const MoonIcon: React.FC<IconProps> = ({ size, className }) => (
+  <FillBase size={size} className={className}>
+    <path d="M8.4 1.6a6.4 6.4 0 1 0 6 8.7.7.7 0 0 0-.92-.9 5 5 0 0 1-4.86-8.4.7.7 0 0 0-.22-1.4z" />
+  </FillBase>
 );
 
-export const SunIcon: React.FC<IconProps> = (props) => (
-  <IconBase {...props}>
-    <circle cx="12" cy="12" r="5" />
-    <line x1="12" y1="1" x2="12" y2="3" />
-    <line x1="12" y1="21" x2="12" y2="23" />
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-    <line x1="1" y1="12" x2="3" y2="12" />
-    <line x1="21" y1="12" x2="23" y2="12" />
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-  </IconBase>
+export const SunIcon: React.FC<IconProps> = ({ size, className }) => (
+  <FillBase size={size} className={className}>
+    <path d="M8 4.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" />
+    <path d="M8 .3a.8.8 0 0 1 .8.8v1.1a.8.8 0 0 1-1.6 0V1.1A.8.8 0 0 1 8 .3zM8 13a.8.8 0 0 1 .8.8v1.1a.8.8 0 0 1-1.6 0v-1.1A.8.8 0 0 1 8 13zM1.1 7.2h1.1a.8.8 0 0 1 0 1.6H1.1a.8.8 0 0 1 0-1.6zM13.8 7.2h1.1a.8.8 0 0 1 0 1.6h-1.1a.8.8 0 0 1 0-1.6zM3.23 2.43a.8.8 0 0 1 1.13 0l.78.78a.8.8 0 1 1-1.13 1.13l-.78-.78a.8.8 0 0 1 0-1.13zM10.86 10.06a.8.8 0 0 1 1.13 0l.78.78a.8.8 0 1 1-1.13 1.13l-.78-.78a.8.8 0 0 1 0-1.13zM3.23 13.57a.8.8 0 0 1 0-1.13l.78-.78a.8.8 0 1 1 1.13 1.13l-.78.78a.8.8 0 0 1-1.13 0zM10.86 5.94a.8.8 0 0 1 0-1.13l.78-.78a.8.8 0 1 1 1.13 1.13l-.78.78a.8.8 0 0 1-1.13 0z" />
+  </FillBase>
 );
 
 export const ImportIcon: React.FC<IconProps> = (props) => (
@@ -152,9 +167,8 @@ export const LinkIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
-export const XIcon: React.FC<IconProps> = (props) => (
-  <IconBase {...props}>
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </IconBase>
+export const XIcon: React.FC<IconProps> = ({ size, className }) => (
+  <FillBase size={size} className={className}>
+    <path d="M3.34 2.26a.9.9 0 0 0-1.08 1.4L6.74 8.3l-4.48 4.44a.9.9 0 1 0 1.26 1.28L8 9.58l4.48 4.44a.9.9 0 1 0 1.26-1.28L9.26 8.3l4.48-4.44a.9.9 0 1 0-1.26-1.28L8 7.02 3.34 2.26z" />
+  </FillBase>
 );

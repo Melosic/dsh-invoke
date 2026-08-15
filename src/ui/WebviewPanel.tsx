@@ -49,7 +49,7 @@ declare const __DSH_INVOKE_VERSION__: string;
 export interface WebviewPanelProps {
   /** 预留：可选获取编辑器选中文本的回调（浏览器端暂不注入） */
   getSelectedText?: () => string | null;
-  /** 关闭面板（由 client/index.ts 注入，隐藏挂载根节点） */
+  /** 关闭面板（由 client/index.tsx 注入，隐藏挂载根节点） */
   onClose?: () => void;
 }
 
