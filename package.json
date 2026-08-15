@@ -60,7 +60,7 @@
     "@deepseek-ai/dsh-cmdline": "^0.1.0-rc.6",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^20.0.0",
+    "@types/node": "^22.0.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "esbuild": "^0.28.2",
@@ -69,7 +69,7 @@
     "typescript": "^5.0.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "^22.19.0 || >=24.0.0"
   },
   "jest": {
     "preset": "ts-jest",
