@@ -150,7 +150,7 @@ pnpm add dsh-invoke
 - **项目级（可写，优先级高）**：`.harness/prompts.json`
 - **别名**：用户级 `aliases.json`（全局）
 
-> 注意：项目级路径基于 Host 进程的工作目录（`process.cwd()`），在插件加载时解析一次；运行中切换工作区不会自动更新。导入（merge/overwrite）与新增提示词遵循同一写入层级策略：有工作区写项目级，否则写用户级。
+> 注意：项目根目录的解析方式。**命令调用**（`/prompt`、`/prompt-list`、`/<别名>`）中，项目级存储跟随发起调用的会话真实工作目录（`agent.session.header.cwd`）。**HTTP**（`/api/dsh-invoke/*`）支持显式传 `?cwd=`（或 JSON body 中的 `cwd`）；未传时回落到插件加载时捕获的 Host 进程工作目录。`GET /api/dsh-invoke/workspace` 返回解析后的根目录、项目级存储路径，以及该目录是否为已注册的 dsh workspace。导入（merge/overwrite）与新增提示词遵循同一写入层级策略：有工作区写项目级，否则写用户级。
 
 ### 合并策略
 

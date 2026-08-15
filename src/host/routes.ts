@@ -27,6 +27,7 @@ import {
   normalizeAliasInput,
 } from '../storage/alias-store.js';
 import { syncAliasCommands } from '../commands/alias.js';
+import { resolveStorageContext } from '../storage/context.js';
 import {
   exportToJSON,
   exportToYAML,
@@ -94,6 +95,13 @@ function pathSegments(url: string | undefined): string[] {
     });
 }
 
+/** 从查询串提取显式工作目录（?cwd=），用于按调用方上下文解析项目级存储 */
+function queryCwd(url: string | undefined): string | undefined {
+  const raw = new URL(url ?? '/', 'http://localhost').searchParams.get('cwd');
+  const trimmed = raw?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 // ============ 路由注册 ============
 
 /**
@@ -118,7 +126,7 @@ export function registerRoutes(ctx: Context): () => void {
 
       if (req.method === 'GET') {
         const sortMode = (url.searchParams.get('sort') as PromptSortMode) || 'smart';
-        const prompts = getSortedPrompts(sortMode);
+        const prompts = getSortedPrompts(sortMode, queryCwd(req.url));
         return json(res, 200, { prompts });
       }
 
@@ -127,11 +135,11 @@ export function registerRoutes(ctx: Context): () => void {
           const body = (await readJsonBody(req)) as Omit<
             Prompt,
             'builtin' | 'usageCount' | 'createdAt' | 'updatedAt'
-          >;
+          > & { cwd?: string };
           if (!body.id || !body.title || !body.body) {
             return badRequest(res, '缺少必填字段（id / title / body）');
           }
-          const created = addPrompt(body);
+          const created = addPrompt(body, body.cwd?.trim() || queryCwd(req.url));
           return json(res, 201, created);
         } catch (error) {
           return error instanceof Error
@@ -154,27 +162,31 @@ export function registerRoutes(ctx: Context): () => void {
     handler: async (req, res) => {
       const parts = pathSegments(req.url);
       const id = parts[3];
+      const cwd = queryCwd(req.url);
 
       if (!id) return notFound(res);
 
       // 使用次数
       if (parts[4] === 'use' && req.method === 'POST') {
-        incrementUsage(id);
+        incrementUsage(id, cwd);
         return json(res, 200, { success: true });
       }
 
       if (req.method === 'GET') {
-        const prompt = getPromptById(id);
+        const prompt = getPromptById(id, cwd);
         if (!prompt) return notFound(res, `提示词 ${id} 不存在`);
         return json(res, 200, prompt);
       }
 
       if (req.method === 'PUT') {
         try {
-          const body = await readJsonBody(req);
+          const body = (await readJsonBody(req)) as Partial<
+            Omit<Prompt, 'id' | 'builtin' | 'createdAt'>
+          > & { cwd?: string };
           const updated = updatePrompt(
             id,
-            body as Partial<Omit<Prompt, 'id' | 'builtin' | 'createdAt'>>
+            body,
+            body.cwd?.trim() || cwd
           );
           if (!updated) return notFound(res, `提示词 ${id} 不存在`);
           return json(res, 200, updated);
@@ -186,7 +198,7 @@ export function registerRoutes(ctx: Context): () => void {
       }
 
       if (req.method === 'DELETE') {
-        const deleted = deletePrompt(id);
+        const deleted = deletePrompt(id, cwd);
         // deletePrompt 级联删除了该提示词的别名，此处同步注销对应命令
         if (deleted) syncAliasCommands(ctx);
         return json(res, 200, { success: deleted });
@@ -211,11 +223,12 @@ export function registerRoutes(ctx: Context): () => void {
 
       if (req.method === 'POST') {
         try {
-          const body = (await readJsonBody(req)) as { alias?: string; promptId?: string };
+          const body = (await readJsonBody(req)) as { alias?: string; promptId?: string; cwd?: string };
           if (!body.alias || !body.promptId) {
             return badRequest(res, '缺少必填字段（alias / promptId）');
           }
-          if (!getPromptById(body.promptId)) {
+          const cwd = body.cwd?.trim() || queryCwd(req.url);
+          if (!getPromptById(body.promptId, cwd)) {
             return badRequest(res, `提示词 ID「${body.promptId}」不存在`);
           }
 
@@ -260,16 +273,16 @@ export function registerRoutes(ctx: Context): () => void {
       const url = new URL(req.url ?? '/', 'http://localhost');
 
       if (req.method === 'GET') {
-        return json(res, 200, { categories: getAllCategories() });
+        return json(res, 200, { categories: getAllCategories(queryCwd(req.url)) });
       }
 
       if (req.method === 'POST') {
         try {
-          const body = (await readJsonBody(req)) as { name?: string };
+          const body = (await readJsonBody(req)) as { name?: string; cwd?: string };
           if (!body.name || !body.name.trim()) {
             return badRequest(res, '分类名称不能为空');
           }
-          addCustomCategory(body.name.trim());
+          addCustomCategory(body.name.trim(), body.cwd?.trim() || queryCwd(req.url));
           return json(res, 201, { success: true });
         } catch (error) {
           return serverError(res, error);
@@ -279,7 +292,7 @@ export function registerRoutes(ctx: Context): () => void {
       if (req.method === 'DELETE') {
         const name = url.searchParams.get('name');
         if (!name) return badRequest(res, '缺少分类名称（?name=）');
-        removeCustomCategory(name);
+        removeCustomCategory(name, queryCwd(req.url));
         return json(res, 200, { success: true });
       }
 
@@ -299,14 +312,16 @@ export function registerRoutes(ctx: Context): () => void {
           content: string;
           format: 'json' | 'yaml';
           mode: 'overwrite' | 'merge';
+          cwd?: string;
         };
         if (typeof body.content !== 'string' || !body.content) {
           return badRequest(res, '缺少导入内容');
         }
+        const cwd = body.cwd?.trim() || queryCwd(req.url);
         const result: ImportResult =
           body.format === 'yaml'
-            ? importFromYAML(body.content, body.mode || 'merge')
-            : importFromJSON(body.content, body.mode || 'merge');
+            ? importFromYAML(body.content, body.mode || 'merge', cwd)
+            : importFromJSON(body.content, body.mode || 'merge', cwd);
         return json(res, result.success ? 200 : 400, result);
       } catch (error) {
         return serverError(res, error);
@@ -323,8 +338,44 @@ export function registerRoutes(ctx: Context): () => void {
       if (req.method !== 'GET') return notFound(res);
       const url = new URL(req.url ?? '/', 'http://localhost');
       const format = url.searchParams.get('format') || 'json';
-      const content = format === 'yaml' ? exportToYAML() : exportToJSON();
+      const cwd = queryCwd(req.url);
+      const content = format === 'yaml' ? exportToYAML(cwd) : exportToJSON(cwd);
       return text(res, 200, content);
+    },
+  });
+
+  // ---- 工作区信息 ----
+  // 返回项目级存储解析结果，供 UI / 诊断使用。
+  // cwd 来源优先级：?cwd= > 插件加载时的全局初始化值（Host 进程工作目录）。
+  // workspaceRegistry 存在时顺带验证该目录是否为 dsh 注册的 workspace。
+
+  add({
+    kind: 'exact',
+    path: `${API_BASE}/workspace`,
+    handler: async (req, res) => {
+      if (req.method !== 'GET') return notFound(res);
+      const cwd = queryCwd(req.url);
+      const { workspaceRoot, projectStoragePath } = resolveStorageContext(cwd);
+
+      let registered: boolean | null = null;
+      if (workspaceRoot) {
+        // 运行时鸭子类型探测，避免硬依赖 workspaceRegistry 服务
+        const registry = (ctx as { workspaceRegistry?: { resolveByPath(p: string): Promise<unknown> } })
+          .workspaceRegistry;
+        if (typeof registry?.resolveByPath === 'function') {
+          try {
+            registered = (await registry.resolveByPath(workspaceRoot)) !== undefined;
+          } catch {
+            registered = false; // 目录不存在等解析失败
+          }
+        }
+      }
+
+      return json(res, 200, {
+        workspaceRoot,
+        projectStoragePath,
+        registeredWorkspace: registered,
+      });
     },
   });
 

@@ -150,7 +150,7 @@ Most operations can be done via the sidebar; the command line targets keyboard-d
 - **Project-level (writable, higher priority)**: `.harness/prompts.json`
 - **Aliases**: user-level `aliases.json` (global)
 
-> Note: the project-level path is resolved from the Host process working directory (`process.cwd()`) once at plugin load; switching workspaces at runtime does not refresh it. Imports (merge/overwrite) follow the same write-layer policy as creating prompts: project-level when a workspace exists, otherwise user-level.
+> Note: how the project root is resolved. In **command invocations** (`/prompt`, `/prompt-list`, `/<alias>`), project-level storage follows the invoking session's real working directory (`agent.session.header.cwd`). Over **HTTP** (`/api/dsh-invoke/*`), callers may pass an explicit `?cwd=` (or `cwd` in the JSON body); when omitted it falls back to the Host process working directory captured once at plugin load. `GET /api/dsh-invoke/workspace` reports the resolved root, the project storage path, and whether the directory is a registered dsh workspace. Imports (merge/overwrite) follow the same write-layer policy as creating prompts: project-level when a workspace exists, otherwise user-level.
 
 ### Merge Strategy
 

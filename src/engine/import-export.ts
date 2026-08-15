@@ -21,17 +21,19 @@ export interface ImportResult {
 
 /**
  * 导出数据为 JSON 字符串（合并用户级 + 项目级，保证备份完整）
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function exportToJSON(): string {
-  const { storage } = getMergedStorage();
+export function exportToJSON(cwd?: string | null): string {
+  const { storage } = getMergedStorage(cwd);
   return JSON.stringify(storage, null, 2);
 }
 
 /**
  * 导出数据为 YAML 字符串（合并用户级 + 项目级，保证备份完整）
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function exportToYAML(): string {
-  const { storage } = getMergedStorage();
+export function exportToYAML(cwd?: string | null): string {
+  const { storage } = getMergedStorage(cwd);
   return yaml.dump(storage, { noRefs: true, lineWidth: 120 });
 }
 
@@ -42,8 +44,9 @@ export function exportToYAML(): string {
  * 写入目标与新增提示词策略一致：有工作区写项目级，否则写用户级
  * @param data 解析后的存储对象
  * @param mode 导入模式：'overwrite' 覆盖全部 | 'merge' 合并（保留已有，添加新的）
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-function importStorage(data: PromptStorage, mode: 'overwrite' | 'merge'): ImportResult {
+function importStorage(data: PromptStorage, mode: 'overwrite' | 'merge', cwd?: string | null): ImportResult {
   if (!data || !data.version || !Array.isArray(data.prompts)) {
     return {
       success: false,
@@ -54,7 +57,7 @@ function importStorage(data: PromptStorage, mode: 'overwrite' | 'merge'): Import
   }
 
   if (mode === 'overwrite') {
-    writeToActiveLayer(data);
+    writeToActiveLayer(data, cwd);
     return {
       success: true,
       message: `导入成功，共 ${data.prompts.length} 条提示词`,
@@ -63,7 +66,7 @@ function importStorage(data: PromptStorage, mode: 'overwrite' | 'merge'): Import
     };
   }
 
-  const current = getActiveLayerStorage();
+  const current = getActiveLayerStorage(cwd);
 
   const mergedCategories = [...current.categories];
   const mergedCustomCategories = [...current.customCategories];
@@ -96,7 +99,7 @@ function importStorage(data: PromptStorage, mode: 'overwrite' | 'merge'): Import
     prompts: mergedPrompts
   };
 
-  writeToActiveLayer(newStorage);
+  writeToActiveLayer(newStorage, cwd);
 
   return {
     success: true,
@@ -111,11 +114,12 @@ function importStorage(data: PromptStorage, mode: 'overwrite' | 'merge'): Import
  */
 export function importFromJSON(
   jsonString: string,
-  mode: 'overwrite' | 'merge'
+  mode: 'overwrite' | 'merge',
+  cwd?: string | null
 ): ImportResult {
   try {
     const data = JSON.parse(jsonString) as PromptStorage;
-    return importStorage(data, mode);
+    return importStorage(data, mode, cwd);
   } catch (error) {
     return {
       success: false,
@@ -131,11 +135,12 @@ export function importFromJSON(
  */
 export function importFromYAML(
   yamlString: string,
-  mode: 'overwrite' | 'merge'
+  mode: 'overwrite' | 'merge',
+  cwd?: string | null
 ): ImportResult {
   try {
     const data = yaml.load(yamlString) as PromptStorage;
-    return importStorage(data, mode);
+    return importStorage(data, mode, cwd);
   } catch (error) {
     return {
       success: false,

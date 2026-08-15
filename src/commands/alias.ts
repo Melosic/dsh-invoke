@@ -59,19 +59,25 @@ function describePromptTitle(entry: AliasEntry): string {
 
 // ============ 调用链：/<别名> [内容] ============
 
+/** 从命令调用中提取会话工作目录（项目级存储跟随真实会话 cwd） */
+function cwdOf(invocation: CommandInvocation): string | undefined {
+  return invocation.agent.session.header?.cwd ?? undefined;
+}
+
 /**
  * 执行别名调用：
- *   1. 解析别名 → 提示词
+ *   1. 解析别名 → 提示词（项目级存储按会话 cwd 解析）
  *   2. 用 rawInput 填充变量（单变量填全部；多变量按声明顺序用 || 分隔）
  *   3. 渲染模板 → 复制到剪贴板（失败时回显正文供手动复制）
  */
 async function invokeAlias(alias: string, invocation: CommandInvocation): Promise<CommandResult> {
+  const cwd = cwdOf(invocation);
   const entry = getAlias(alias);
   if (!entry) {
     return { kind: 'error', text: `别名「/${alias}」已不存在，可用 /alias 查看当前列表` };
   }
 
-  const prompt = getPromptById(entry.promptId);
+  const prompt = getPromptById(entry.promptId, cwd);
   if (!prompt) {
     return { kind: 'error', text: `别名「/${alias}」指向的提示词已被删除，请重新设置` };
   }
@@ -106,7 +112,7 @@ async function invokeAlias(alias: string, invocation: CommandInvocation): Promis
 
   // ---- 渲染 + 复制 ----
   const rendered = renderTemplate(prompt.body, values);
-  incrementUsage(prompt.id);
+  incrementUsage(prompt.id, cwd);
 
   const copied = await copyToClipboard(rendered);
   if (copied) {

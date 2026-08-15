@@ -4,10 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
 import {
-  initStorageContext,
-  getProjectStoragePath,
-  hasProjectStorage,
-  getWorkspaceRoot
+  resolveStorageContext
 } from './context.js';
 import { removeAliasesByPromptId } from './alias-store.js';
 
@@ -152,22 +149,24 @@ export function writeStorage(data: PromptStorage): void {
 
 /**
  * 读取项目级存储（无工作区则返回 null）
+ * @param cwd 显式工作目录（如 agent.session.header.cwd）；缺省用全局初始化值
  */
-export function readProjectStorage(): PromptStorage | null {
-  const projectPath = getProjectStoragePath();
-  if (!projectPath) return null;
-  return readStorageAt(projectPath);
+export function readProjectStorage(cwd?: string | null): PromptStorage | null {
+  const { projectStoragePath } = resolveStorageContext(cwd);
+  if (!projectStoragePath) return null;
+  return readStorageAt(projectStoragePath);
 }
 
 /**
  * 写入项目级存储（无工作区则抛错）
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function writeProjectStorage(data: PromptStorage): void {
-  const projectPath = getProjectStoragePath();
-  if (!projectPath) {
+export function writeProjectStorage(data: PromptStorage, cwd?: string | null): void {
+  const { projectStoragePath } = resolveStorageContext(cwd);
+  if (!projectStoragePath) {
     throw new Error('当前未打开工作区，无法写入项目级存储');
   }
-  writeStorageAt(projectPath, data);
+  writeStorageAt(projectStoragePath, data);
 }
 
 // ============ 双层合并 ============
@@ -175,17 +174,25 @@ export function writeProjectStorage(data: PromptStorage): void {
 /**
  * 合并用户级与项目级存储
  * 项目级优先级更高，相同 ID 的提示词以项目级为准
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function getMergedStorage(): {
+export function getMergedStorage(cwd?: string | null): {
   storage: PromptStorage;
   writable: 'user' | 'project' | 'both';
+  /** 本次合并实际使用的项目级存储路径（无工作区为 null） */
+  projectStoragePath: string | null;
 } {
   const userStorage = readStorage();
-  const projectStorage = readProjectStorage();
+  const { projectStoragePath } = resolveStorageContext(cwd);
+  const projectStorage = projectStoragePath ? readStorageAt(projectStoragePath) : null;
 
   if (!projectStorage) {
     // 有工作区时写入目标是项目级（addPrompt 会在写入时自动创建），故为 both
-    return { storage: userStorage, writable: hasProjectStorage() ? 'both' : 'user' };
+    return {
+      storage: userStorage,
+      writable: projectStoragePath ? 'both' : 'user',
+      projectStoragePath
+    };
   }
 
   // 合并分类：预置 + 用户自定义 + 项目自定义 + 两层存储中出现的非预置分类
@@ -211,7 +218,8 @@ export function getMergedStorage(): {
       customCategories,
       prompts: [...mergedPrompts.values()]
     },
-    writable: hasProjectStorage() ? 'both' : 'user'
+    writable: projectStoragePath ? 'both' : 'user',
+    projectStoragePath
   };
 }
 
@@ -220,18 +228,21 @@ export function getMergedStorage(): {
 /**
  * 获取当前写入目标层级的存储（与 addPrompt 策略一致）：
  * 有工作区 → 项目级（不存在则以默认结构起步）；无工作区 → 用户级
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function getActiveLayerStorage(): PromptStorage {
-  if (hasProjectStorage()) {
-    return readProjectStorage() ?? getDefaultStorage();
+export function getActiveLayerStorage(cwd?: string | null): PromptStorage {
+  const { projectStoragePath } = resolveStorageContext(cwd);
+  if (projectStoragePath) {
+    return readStorageAt(projectStoragePath) ?? getDefaultStorage();
   }
   return readStorage();
 }
 
 /** 写入当前活跃层级（与 getActiveLayerStorage 对应） */
-export function writeToActiveLayer(data: PromptStorage): void {
-  if (hasProjectStorage()) {
-    writeProjectStorage(data);
+export function writeToActiveLayer(data: PromptStorage, cwd?: string | null): void {
+  const { projectStoragePath } = resolveStorageContext(cwd);
+  if (projectStoragePath) {
+    writeStorageAt(projectStoragePath, data);
   } else {
     writeStorage(data);
   }
@@ -241,39 +252,42 @@ export function writeToActiveLayer(data: PromptStorage): void {
 
 /**
  * 获取所有提示词（合并用户级 + 项目级）
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function getAllPrompts(): Prompt[] {
-  return getMergedStorage().storage.prompts;
+export function getAllPrompts(cwd?: string | null): Prompt[] {
+  return getMergedStorage(cwd).storage.prompts;
 }
 
 /**
  * 根据 ID 获取单个提示词（合并后查找）
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function getPromptById(id: string): Prompt | null {
-  return getAllPrompts().find(p => p.id === id) || null;
+export function getPromptById(id: string, cwd?: string | null): Prompt | null {
+  return getAllPrompts(cwd).find(p => p.id === id) || null;
 }
 
 /**
  * 获取所有分类（预置 + 合并后的自定义分类）
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function getAllCategories(): string[] {
-  const { storage } = getMergedStorage();
+export function getAllCategories(cwd?: string | null): string[] {
+  const { storage } = getMergedStorage(cwd);
   return [...storage.categories, ...storage.customCategories];
 }
 
 /**
  * 判断提示词 ID 是否已存在（合并视图）
  */
-function promptExistsInAny(id: string): boolean {
-  return getAllPrompts().some(p => p.id === id);
+function promptExistsInAny(id: string, cwd?: string | null): boolean {
+  return getAllPrompts(cwd).some(p => p.id === id);
 }
 
 /**
  * 判断提示词在用户级/项目级中的存在情况
  */
-function locatePrompt(id: string): { inUser: boolean; inProject: boolean } {
+function locatePrompt(id: string, cwd?: string | null): { inUser: boolean; inProject: boolean } {
   const user = readStorage();
-  const project = readProjectStorage();
+  const project = readProjectStorage(cwd);
   return {
     inUser: user.prompts.some(p => p.id === id),
     inProject: project ? project.prompts.some(p => p.id === id) : false
@@ -283,9 +297,13 @@ function locatePrompt(id: string): { inUser: boolean; inProject: boolean } {
 /**
  * 添加新提示词
  * 优先写入项目级（若已打开工作区），否则写入用户级
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function addPrompt(prompt: Omit<Prompt, 'builtin' | 'usageCount' | 'createdAt' | 'updatedAt'>): Prompt {
-  if (promptExistsInAny(prompt.id)) {
+export function addPrompt(
+  prompt: Omit<Prompt, 'builtin' | 'usageCount' | 'createdAt' | 'updatedAt'>,
+  cwd?: string | null
+): Prompt {
+  if (promptExistsInAny(prompt.id, cwd)) {
     throw new Error(`提示词 ID "${prompt.id}" 已存在`);
   }
 
@@ -297,18 +315,23 @@ export function addPrompt(prompt: Omit<Prompt, 'builtin' | 'usageCount' | 'creat
     updatedAt: new Date().toISOString()
   };
 
-  const storage = getActiveLayerStorage();
+  const storage = getActiveLayerStorage(cwd);
   storage.prompts.push(newPrompt);
-  writeToActiveLayer(storage);
+  writeToActiveLayer(storage, cwd);
   return newPrompt;
 }
 
 /**
  * 更新提示词
  * 更新所在层级的记录（若项目级有则更新项目级，否则更新用户级）
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function updatePrompt(id: string, updates: Partial<Omit<Prompt, 'id' | 'builtin' | 'createdAt'>>): Prompt | null {
-  const { inUser, inProject } = locatePrompt(id);
+export function updatePrompt(
+  id: string,
+  updates: Partial<Omit<Prompt, 'id' | 'builtin' | 'createdAt'>>,
+  cwd?: string | null
+): Prompt | null {
+  const { inUser, inProject } = locatePrompt(id, cwd);
   if (!inUser && !inProject) {
     return null;
   }
@@ -319,11 +342,11 @@ export function updatePrompt(id: string, updates: Partial<Omit<Prompt, 'id' | 'b
     updatedAt: new Date().toISOString()
   });
 
-  if (inProject && hasProjectStorage()) {
-    const project = readProjectStorage()!;
+  if (inProject) {
+    const project = readProjectStorage(cwd)!;
     const idx = project.prompts.findIndex(p => p.id === id);
     project.prompts[idx] = applyUpdates(project.prompts[idx]);
-    writeProjectStorage(project);
+    writeProjectStorage(project, cwd);
     return project.prompts[idx];
   }
 
@@ -337,9 +360,10 @@ export function updatePrompt(id: string, updates: Partial<Omit<Prompt, 'id' | 'b
 /**
  * 删除提示词
  * 从所在层级删除（若两层都存在则同时删除），并级联删除其别名
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function deletePrompt(id: string): boolean {
-  const { inUser, inProject } = locatePrompt(id);
+export function deletePrompt(id: string, cwd?: string | null): boolean {
+  const { inUser, inProject } = locatePrompt(id, cwd);
   if (!inUser && !inProject) {
     return false;
   }
@@ -353,10 +377,10 @@ export function deletePrompt(id: string): boolean {
     deleted = true;
   }
 
-  if (inProject && hasProjectStorage()) {
-    const project = readProjectStorage()!;
+  if (inProject) {
+    const project = readProjectStorage(cwd)!;
     project.prompts = project.prompts.filter(p => p.id !== id);
-    writeProjectStorage(project);
+    writeProjectStorage(project, cwd);
     deleted = true;
   }
 
@@ -372,19 +396,20 @@ export function deletePrompt(id: string): boolean {
  * 增加使用次数
  * 同时记录最近使用时间（lastUsedAt），供智能排序使用。
  * 提示词可能同时存在于两层，两层副本都更新以保持计数一致。
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function incrementUsage(id: string): void {
-  const { inUser, inProject } = locatePrompt(id);
+export function incrementUsage(id: string, cwd?: string | null): void {
+  const { inUser, inProject } = locatePrompt(id, cwd);
   const now = new Date().toISOString();
 
-  if (inProject && hasProjectStorage()) {
-    const project = readProjectStorage()!;
+  if (inProject) {
+    const project = readProjectStorage(cwd)!;
     const prompt = project.prompts.find(p => p.id === id);
     if (prompt) {
       prompt.usageCount = (prompt.usageCount || 0) + 1;
       prompt.lastUsedAt = now;
       prompt.updatedAt = now;
-      writeProjectStorage(project);
+      writeProjectStorage(project, cwd);
     }
   }
 
@@ -403,35 +428,35 @@ export function incrementUsage(id: string): void {
 /**
  * 添加自定义分类
  * 优先写入项目级，否则写入用户级
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function addCustomCategory(name: string): void {
-  const { storage } = getMergedStorage();
+export function addCustomCategory(name: string, cwd?: string | null): void {
+  const { storage } = getMergedStorage(cwd);
   if (storage.customCategories.includes(name)) {
     return;
   }
 
-  const target = getActiveLayerStorage();
+  const target = getActiveLayerStorage(cwd);
   if (!target.customCategories.includes(name)) {
     target.customCategories.push(name);
-    writeToActiveLayer(target);
+    writeToActiveLayer(target, cwd);
   }
 }
 
 /**
  * 删除自定义分类
  * 从所有层级中移除
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function removeCustomCategory(name: string): void {
+export function removeCustomCategory(name: string, cwd?: string | null): void {
   const user = readStorage();
   user.customCategories = user.customCategories.filter(c => c !== name);
   writeStorage(user);
 
-  if (hasProjectStorage()) {
-    const project = readProjectStorage();
-    if (project) {
-      project.customCategories = project.customCategories.filter(c => c !== name);
-      writeProjectStorage(project);
-    }
+  const project = readProjectStorage(cwd);
+  if (project) {
+    project.customCategories = project.customCategories.filter(c => c !== name);
+    writeProjectStorage(project, cwd);
   }
 }
 
@@ -460,9 +485,10 @@ export function computeSmartScore(prompt: Prompt, now: number = Date.now()): num
 
 /**
  * 获取按指定模式排序的提示词列表
+ * @param cwd 显式工作目录；缺省用全局初始化值
  */
-export function getSortedPrompts(mode: PromptSortMode = 'smart'): Prompt[] {
-  const prompts = getAllPrompts();
+export function getSortedPrompts(mode: PromptSortMode = 'smart', cwd?: string | null): Prompt[] {
+  const prompts = getAllPrompts(cwd);
   const now = Date.now();
 
   switch (mode) {

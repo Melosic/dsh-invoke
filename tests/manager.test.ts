@@ -285,6 +285,41 @@ describe('project storage (with workspace + merge)', () => {
     expect(readStorage().prompts.find(p => p.id === 'p1')?.usageCount).toBe(1);
     expect(readProjectStorage()?.prompts.find(p => p.id === 'p1')?.usageCount).toBe(1);
   });
+});
+
+describe('explicit cwd (session-scoped project storage)', () => {
+  // 全局初始化到 /workspace（模拟 Host 启动目录），显式 cwd 模拟会话真实目录
+  beforeAll(() => initStorageContext('/workspace'));
+  beforeEach(() => mockFs.__reset());
+
+  test('显式 cwd 覆盖全局工作区：读写指向会话目录', () => {
+    addPrompt(basePrompt('scoped'), '/sessions/alpha');
+    // 写入的是 /sessions/alpha/.harness/prompts.json，而非 /workspace 下
+    expect(readProjectStorage('/sessions/alpha')?.prompts.some(p => p.id === 'scoped')).toBe(true);
+    expect(readProjectStorage()?.prompts.some(p => p.id === 'scoped') ?? false).toBe(false);
+  });
+
+  test('getMergedStorage 显式 cwd 返回对应项目路径', () => {
+    const { projectStoragePath } = getMergedStorage('/sessions/beta');
+    expect(projectStoragePath).toBe('/sessions/beta/.harness/prompts.json');
+  });
+
+  test('getPromptById / incrementUsage / deletePrompt 均跟随显式 cwd', () => {
+    writeProjectStorage(makeStorage([makePrompt({ id: 'pc', usageCount: 0 })]), '/sessions/gamma');
+    expect(getPromptById('pc', '/sessions/gamma')).not.toBeNull();
+    expect(getPromptById('pc')).toBeNull(); // 全局 /workspace 下不存在
+
+    incrementUsage('pc', '/sessions/gamma');
+    expect(readProjectStorage('/sessions/gamma')?.prompts.find(p => p.id === 'pc')?.usageCount).toBe(1);
+
+    expect(deletePrompt('pc', '/sessions/gamma')).toBe(true);
+    expect(readProjectStorage('/sessions/gamma')?.prompts.some(p => p.id === 'pc')).toBe(false);
+  });
+
+  test('cwd 为空串/空白时回落全局初始化值', () => {
+    const { projectStoragePath } = getMergedStorage('   ');
+    expect(projectStoragePath).toBe('/workspace/.harness/prompts.json');
+  });
 
   test('writeProjectStorage 无工作区时抛错', () => {
     initStorageContext(null);
