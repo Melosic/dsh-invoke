@@ -440,6 +440,17 @@ body[data-ds-dark-theme] #dsh-invoke-root,
   background: var(--pv-accent-soft);
   color: var(--pv-accent);
 }
+.pv-tag-alias {
+  background: transparent;
+  border: 1px dashed var(--pv-accent);
+  color: var(--pv-accent);
+  cursor: pointer;
+  font-family: var(--pv-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  transition: background 0.15s ease;
+}
+.pv-tag-alias:hover {
+  background: var(--pv-accent-soft);
+}
 .pv-card-footer { display: flex; justify-content: flex-end; }
 
 /* 主按钮（Harness 近黑底白字）*/

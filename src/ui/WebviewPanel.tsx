@@ -14,7 +14,8 @@ import {
   InboxIcon,
   MoonIcon,
   SunIcon,
-  BookmarkIcon
+  BookmarkIcon,
+  LinkIcon
 } from './icons.js';
 import { useTheme, ThemeMode } from './theme.js';
 import { injectStyles } from './styles.js';
@@ -26,14 +27,17 @@ import { ConfirmDialog } from './components/ConfirmDialog.js';
 import {
   Prompt,
   Variable,
+  AliasEntry,
   getAllCategories,
   getSortedPrompts,
+  getAllAliases,
   deletePrompt,
   incrementUsage,
   exportPrompts
 } from '../client/api.js';
 import { renderTemplate, extractVariablesFromBody } from '../engine/template.js';
 import { prepareVariables } from '../engine/variable-resolver.js';
+import { AliasDialog } from './components/AliasDialog.js';
 
 // ============ React 组件 ============
 
@@ -70,6 +74,10 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
   // 删除确认对话框状态
   const [deleteTarget, setDeleteTarget] = useState<Prompt | null>(null);
 
+  // 别名状态
+  const [aliases, setAliases] = useState<AliasEntry[]>([]);
+  const [aliasTarget, setAliasTarget] = useState<Prompt | null>(null);
+
   // 注入样式（幂等）
   useEffect(() => {
     injectStyles();
@@ -78,12 +86,14 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
   // ============ 加载数据 ============
 
   const loadData = async () => {
-    const [sorted, cats] = await Promise.all([
+    const [sorted, cats, aliasList] = await Promise.all([
       getSortedPrompts('smart'),
-      getAllCategories()
+      getAllCategories(),
+      getAllAliases()
     ]);
     setPrompts(sorted);
     setCategories(cats);
+    setAliases(aliasList);
   };
 
   useEffect(() => {
@@ -112,6 +122,15 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
     }
     return result;
   }, [prompts, selectedCategory, searchQuery]);
+
+  // promptId → 别名 映射（一个提示词最多一个别名）
+  const aliasByPromptId = useMemo(() => {
+    const map = new Map<string, AliasEntry>();
+    aliases.forEach(a => {
+      if (!map.has(a.promptId)) map.set(a.promptId, a);
+    });
+    return map;
+  }, [aliases]);
 
   // ============ 操作函数 ============
 
@@ -363,11 +382,20 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                 </div>
               </div>
             ) : (
-              filteredPrompts.map(prompt => (
+              filteredPrompts.map(prompt => {
+                const aliasEntry = aliasByPromptId.get(prompt.id) ?? null;
+                return (
                 <div key={prompt.id} className="pv-card">
                   <div className="pv-card-header">
                     <span className="pv-card-title">{highlightText(prompt.title, 't')}</span>
                     <div className="pv-card-actions">
+                      <button
+                        className="pv-card-action-btn"
+                        onClick={() => setAliasTarget(prompt)}
+                        title={aliasEntry ? `别名 /${aliasEntry.alias}，点击修改` : '设置别名'}
+                      >
+                        <LinkIcon size={13} />
+                      </button>
                       <button
                         className="pv-card-action-btn"
                         onClick={() => handleEdit(prompt)}
@@ -386,6 +414,23 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                   </div>
                   <div className="pv-card-desc">{highlightText(prompt.description, 'd')}</div>
                   <div className="pv-card-tags">
+                    {aliasEntry && (
+                      <span
+                        className="pv-tag pv-tag-alias"
+                        role="button"
+                        tabIndex={0}
+                        title="点击修改别名"
+                        onClick={() => setAliasTarget(prompt)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setAliasTarget(prompt);
+                          }
+                        }}
+                      >
+                        /{aliasEntry.alias}
+                      </span>
+                    )}
                     {prompt.tags.map(tag => (
                       <span key={tag} className="pv-tag">{tag}</span>
                     ))}
@@ -423,7 +468,8 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                     </button>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -516,6 +562,15 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
         danger
         onConfirm={confirmDelete}
         onClose={() => setDeleteTarget(null)}
+      />
+
+      {/* 别名设置对话框 */}
+      <AliasDialog
+        isOpen={!!aliasTarget}
+        prompt={aliasTarget}
+        currentAlias={aliasTarget ? aliasByPromptId.get(aliasTarget.id) ?? null : null}
+        onClose={() => setAliasTarget(null)}
+        onChanged={loadData}
       />
     </div>
   );
