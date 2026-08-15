@@ -132,6 +132,15 @@ describe('安全门', () => {
     expect(String(r.body?.error)).toContain('Origin');
   });
 
+  test('写操作 Sec-Fetch-Site: cross-site → 403（无 Origin 时的纵深防御）', async () => {
+    const r = await call(PROMPTS, 'POST', '/api/dsh-invoke/prompts', {
+      headers: { 'sec-fetch-site': 'cross-site' },
+      body: { id: 'x2', title: 't', body: 'b' },
+    });
+    expect(r.status).toBe(403);
+    expect(String(r.body?.error)).toContain('Origin');
+  });
+
   test('GET 无 Origin 放行（curl / 服务端调用）', async () => {
     const r = await call(PROMPTS, 'GET', `/api/dsh-invoke/prompts${WS_Q()}`);
     expect(r.status).toBe(200);
@@ -215,5 +224,132 @@ describe('CRUD 透传与方法分派', () => {
     expect(r.status).toBe(200);
     expect(r.body?.workspaceRoot).toBe(tmpWs);
     expect(String(r.body?.projectStoragePath)).toContain('.harness');
+  });
+});
+
+describe('别名路由与 upsert 原子性', () => {
+  const ALIASES = '/api/dsh-invoke/aliases';
+  const promptA = { id: 'rt-alias-a', title: 'Alias A', description: '', category: '开发', tags: [], body: 'a', variables: [] };
+  const promptB = { id: 'rt-alias-b', title: 'Alias B', description: '', category: '开发', tags: [], body: 'b', variables: [] };
+
+  beforeAll(async () => {
+    for (const p of [promptA, promptB]) {
+      const r = await call(PROMPTS, 'POST', `/api/dsh-invoke/prompts${WS_Q()}`, { body: p });
+      expect(r.status).toBe(201);
+    }
+  });
+
+  /** 读取别名映射表 { alias → promptId } */
+  async function aliasMap(): Promise<Record<string, string>> {
+    const r = await call(ALIASES, 'GET', ALIASES);
+    expect(r.status).toBe(200);
+    const map: Record<string, string> = {};
+    for (const e of r.body?.aliases as Array<{ alias: string; promptId: string }>) {
+      map[e.alias] = e.promptId;
+    }
+    return map;
+  }
+
+  test('POST 创建别名 → 201', async () => {
+    const r = await call(ALIASES, 'POST', ALIASES, {
+      body: { alias: 'rt-aa', promptId: promptA.id, cwd: tmpWs },
+    });
+    expect(r.status).toBe(201);
+    expect(r.body?.alias).toBe('rt-aa');
+
+    const r2 = await call(ALIASES, 'POST', ALIASES, {
+      body: { alias: 'rt-bb', promptId: promptB.id, cwd: tmpWs },
+    });
+    expect(r2.status).toBe(201);
+  });
+
+  test('POST 相同别名 + 相同提示词（未变化）→ 200 幂等', async () => {
+    const r = await call(ALIASES, 'POST', ALIASES, {
+      body: { alias: 'rt-bb', promptId: promptB.id, cwd: tmpWs },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body?.alias).toBe('rt-bb');
+  });
+
+  test('POST 撞其他提示词的别名 → 400 且旧别名保留（upsert 原子性）', async () => {
+    // rt-alias-a 已有别名 rt-aa；尝试把它的别名改成被 rt-alias-b 占用的 rt-bb
+    const r = await call(ALIASES, 'POST', ALIASES, {
+      body: { alias: 'rt-bb', promptId: promptA.id, cwd: tmpWs },
+    });
+    expect(r.status).toBe(400);
+
+    // 关键回归断言：失败后旧别名未丢失，目标别名未易主
+    const map = await aliasMap();
+    expect(map['rt-aa']).toBe(promptA.id);
+    expect(map['rt-bb']).toBe(promptB.id);
+  });
+
+  test('POST 重设为新别名 → 201 且完成替换', async () => {
+    const r = await call(ALIASES, 'POST', ALIASES, {
+      body: { alias: 'rt-cc', promptId: promptA.id, cwd: tmpWs },
+    });
+    expect(r.status).toBe(201);
+
+    const map = await aliasMap();
+    expect(map['rt-cc']).toBe(promptA.id);
+    expect(map['rt-aa']).toBeUndefined(); // 旧别名已被替换
+    expect(map['rt-bb']).toBe(promptB.id); // 旁观者不受影响
+  });
+
+  test('POST 指向不存在的提示词 → 400', async () => {
+    const r = await call(ALIASES, 'POST', ALIASES, {
+      body: { alias: 'rt-dd', promptId: 'no-such-prompt', cwd: tmpWs },
+    });
+    expect(r.status).toBe(400);
+  });
+
+  test('DELETE 按 name 删除 → success:true，再删 → success:false', async () => {
+    const del = await call(ALIASES, 'DELETE', `${ALIASES}?name=rt-cc`);
+    expect(del.status).toBe(200);
+    expect(del.body?.success).toBe(true);
+
+    const again = await call(ALIASES, 'DELETE', `${ALIASES}?name=rt-cc`);
+    expect(again.status).toBe(200);
+    expect(again.body?.success).toBe(false);
+  });
+});
+
+describe('导入 / 导出路由', () => {
+  test('POST import（json merge）→ 200 且新增可见', async () => {
+    const content = JSON.stringify({
+      version: 1,
+      prompts: [{ id: 'rt-imp-1', title: 'Imported', body: 'hello' }],
+    });
+    const r = await call('/api/dsh-invoke/import', 'POST', '/api/dsh-invoke/import', {
+      body: { content, format: 'json', mode: 'merge', cwd: tmpWs },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body?.success).toBe(true);
+    expect(r.body?.added).toBe(1);
+
+    const list = await call(PROMPTS, 'GET', `/api/dsh-invoke/prompts${WS_Q()}`);
+    const ids = (list.body?.prompts as Array<{ id: string }>).map((p) => p.id);
+    expect(ids).toContain('rt-imp-1');
+  });
+
+  test('POST import 数据形状非法 → 400', async () => {
+    const r = await call('/api/dsh-invoke/import', 'POST', '/api/dsh-invoke/import', {
+      body: { content: JSON.stringify({ foo: 1 }), format: 'json', mode: 'merge', cwd: tmpWs },
+    });
+    expect(r.status).toBe(400);
+    expect(r.body?.success).toBe(false);
+  });
+
+  test('POST import 缺少内容 → 400', async () => {
+    const r = await call('/api/dsh-invoke/import', 'POST', '/api/dsh-invoke/import', {
+      body: { format: 'json', mode: 'merge', cwd: tmpWs },
+    });
+    expect(r.status).toBe(400);
+  });
+
+  test('GET export（json）→ 200 文本含已导入条目', async () => {
+    const r = await call('/api/dsh-invoke/export', 'GET', `/api/dsh-invoke/export?format=json${WS_Q().replace('?', '&')}`);
+    expect(r.status).toBe(200);
+    expect(r.raw).toContain('rt-imp-1');
   });
 });

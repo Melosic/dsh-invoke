@@ -4,9 +4,10 @@
 //
 // 安全模型（统一安全门，见 add() 包装器）：
 //   1. Host 白名单（全部请求）—— 防 DNS rebinding：攻击者域名重解析到本机回环
-//   2. Origin 同源校验（写操作）—— 防 CSRF：恶意网页跨站 POST/PUT/DELETE
+//   2. 同源校验（写操作）—— 防 CSRF：Sec-Fetch-Site 纵深防御 + Origin 与 Host 比对
 //   3. 显式 cwd 白名单（全部请求）—— 防任意目录写入：?cwd=/body.cwd
-//      必须是已存在目录，且（注册表可用时）为 dsh 已注册的工作区
+//      必须是已存在目录，且为 dsh 已注册的工作区（注册表不可用时收紧为
+//      插件初始化工作区的子树，见 isCwdAllowed 降级分支）
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { stat } from 'node:fs/promises';
@@ -34,9 +35,10 @@ import {
   addAlias,
   removeAlias,
   normalizeAliasInput,
+  validateAliasName,
 } from '../storage/alias-store.js';
 import { syncAliasCommands } from '../commands/alias.js';
-import { resolveStorageContext } from '../storage/context.js';
+import { resolveStorageContext, getWorkspaceRoot } from '../storage/context.js';
 import {
   exportToJSON,
   exportToYAML,
@@ -83,12 +85,19 @@ function isAllowedHost(req: IncomingMessage): boolean {
 }
 
 /**
- * 写操作校验 Origin：存在时必须与 Host 同源（防 CSRF，含 text/plain 表单跨站提交）。
- * GET/HEAD 无副作用不校验；无 Origin 的请求（curl/服务端调用）放行，
+ * 写操作校验同源（防 CSRF，含 text/plain 表单跨站提交）：
+ *   1. Sec-Fetch-Site 纵深防御——现代浏览器跨站请求带 cross-site 标记，
+ *      覆盖个别场景下 Origin 缺失的跨站提交
+ *   2. Origin 存在时必须与 Host 同源
+ * GET/HEAD 无副作用不校验；两者都缺失的请求（curl/服务端调用）放行，
  * 其风险已由 Host 白名单（防 rebinding）覆盖。
  */
 function isSameOrigin(req: IncomingMessage): boolean {
   if (req.method === 'GET' || req.method === 'HEAD') return true;
+  const secFetchSite = req.headers['sec-fetch-site'];
+  if (typeof secFetchSite === 'string' && secFetchSite.trim().toLowerCase() === 'cross-site') {
+    return false;
+  }
   const origin = req.headers.origin;
   if (origin === undefined) return true;
   try {
@@ -111,9 +120,13 @@ async function probeRegisteredWorkspace(ctx: Context, root: string): Promise<boo
 }
 
 /**
- * 校验显式 cwd 是否在允许范围内：必须是已存在的目录，
- * 且（注册表可用时）必须是 dsh 已注册的工作区。
+ * 校验显式 cwd 是否在允许范围内：必须是已存在的目录，且按优先级满足其一：
+ *   1. （注册表可用时）是 dsh 已注册的工作区 —— 最强校验
+ *   2. （注册表不可用的旧版宿主，已打开工作区）位于初始化工作区根目录子树内
+ *   3. （注册表不可用且未打开工作区）无锚点可校验，放行已存在目录
  * 防止任意目录写入原语（向 <任意路径>/.harness/prompts.json 投递文件）。
+ * 第 3 档为文档化降级：该场景下会话 cwd 即工作区锚点（见 resolveStorageContext），
+ * HTTP 面仍由 Host 白名单与同源校验覆盖（README 安全模型一节）。
  */
 async function isCwdAllowed(ctx: Context, raw: string | undefined | null): Promise<boolean> {
   const trimmed = raw?.trim();
@@ -125,7 +138,10 @@ async function isCwdAllowed(ctx: Context, raw: string | undefined | null): Promi
     return false;
   }
   const registered = await probeRegisteredWorkspace(ctx, resolved);
-  return registered !== false;
+  if (registered !== null) return registered;
+  const root = getWorkspaceRoot();
+  if (root === null) return true; // 无锚点：文档化降级
+  return resolved === root || resolved.startsWith(root + path.sep);
 }
 
 function serverError(res: ServerResponse, error: unknown): void {
@@ -144,7 +160,7 @@ function readJsonBody(req: IncomingMessage): Promise<unknown> {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
         req.destroy();
-        reject(new Error('请求体过大（上限 10MB）'));
+        reject(new Error(ht('api.bodyTooLarge')));
         return;
       }
       chunks.push(chunk);
@@ -275,7 +291,7 @@ export function registerRoutes(ctx: Context): () => void {
 
       if (req.method === 'GET') {
         const prompt = getPromptById(id, cwd);
-        if (!prompt) return notFound(res, `提示词 ${id} 不存在`);
+        if (!prompt) return notFound(res, ht('api.promptNotFound', { id }));
         return json(res, 200, prompt);
       }
 
@@ -339,13 +355,20 @@ export function registerRoutes(ctx: Context): () => void {
             return badRequest(res, ht('api.aliasPromptNotFound', { id: body.promptId }));
           }
 
-          // upsert 语义：一个提示词一个别名，重设时替换旧别名
+          // upsert 语义：一个提示词一个别名，重设时替换旧别名。
+          // 先做全量预校验再删除旧别名：若新别名与其他提示词的别名撞名，
+          // addAlias 会抛错——若先删后加，旧别名已丢而新别名未建，数据不一致。
           const normalized = normalizeAliasInput(body.alias);
           const existing = getAliasByPromptId(body.promptId);
+          if (existing && existing.alias === normalized) {
+            return json(res, 200, existing); // 未变化
+          }
+          const validationError = validateAliasName(body.alias);
+          if (validationError) {
+            return badRequest(res, validationError);
+          }
+
           if (existing) {
-            if (existing.alias === normalized) {
-              return json(res, 200, existing); // 未变化
-            }
             removeAlias(existing.alias);
           }
 

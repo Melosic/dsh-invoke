@@ -327,3 +327,41 @@ describe('explicit cwd (session-scoped project storage)', () => {
     initStorageContext('/workspace');
   });
 });
+
+describe('write failure cache consistency', () => {
+  // P2-1 回归：写操作沿用「读（缓存共享引用）→ 就地修改 → 写回」，
+  // 若 writeJsonAtomic 在 rename 阶段失败，必须失效该路径缓存，
+  // 否则下次读命中脏缓存、后续写入把幽灵数据落盘。
+  beforeAll(() => initStorageContext('/workspace'));
+  beforeEach(() => mockFs.__reset());
+
+  test('addPrompt 写失败后：报错、无幽灵数据、后续写入干净', () => {
+    writeProjectStorage(makeStorage([makePrompt({ id: 'ok' })]));
+    expect(getPromptById('ok')).not.toBeNull(); // 预热缓存
+
+    mockFs.__failNextRename();
+    expect(() => addPrompt(basePrompt('ghost'))).toThrow();
+
+    // 缓存已失效：从磁盘重新解析，未落盘的 ghost 不可见
+    expect(getPromptById('ghost')).toBeNull();
+    expect(getPromptById('ok')).not.toBeNull();
+
+    // 后续成功写入不带幽灵数据落盘
+    addPrompt(basePrompt('real'));
+    const project = readProjectStorage();
+    expect(project?.prompts.some(p => p.id === 'ghost')).toBe(false);
+    expect(project?.prompts.some(p => p.id === 'real')).toBe(true);
+    expect(project?.prompts.some(p => p.id === 'ok')).toBe(true);
+  });
+
+  test('updatePrompt 写失败后：内存修改不残留', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'u1', title: 'Old' })]));
+    expect(readStorage().prompts[0].title).toBe('Old'); // 预热缓存
+
+    mockFs.__failNextRename();
+    expect(() => updatePrompt('u1', { title: 'New' })).toThrow();
+
+    // 用户级存储：u1 标题回落到磁盘上的 Old，而非缓存里的 New
+    expect(getPromptById('u1')?.title).toBe('Old');
+  });
+});

@@ -204,6 +204,18 @@ The plugin uses a **Host + Client** two-part structure, following DeepSeek Harne
         └────────────────────┘
 ```
 
+### Security Model
+
+All HTTP routes (`/api/dsh-invoke/*`) pass through three request guards (see `src/host/routes.ts`):
+
+| Guard | Scope | Protects against |
+|---|---|---|
+| Host allowlist (local/LAN addresses only) | All requests | DNS rebinding (attacker domain re-resolving to loopback) |
+| Same-origin check (`Sec-Fetch-Site` + `Origin` vs Host) | Write operations | CSRF (malicious cross-site POST/PUT/DELETE) |
+| cwd allowlist | Requests with explicit `?cwd=` | Arbitrary directory writes |
+
+The cwd allowlist has three tiers by priority: registered dsh workspace when the registry is available (strongest); subtree of the initialized workspace when the registry is unavailable; any existing directory as a documented degradation when neither anchor exists (the HTTP surface remains covered by the first two guards). Request bodies are capped at 10MB, and storage writes use atomic replace with a `.bak` backup.
+
 ### Source Layout
 
 ```

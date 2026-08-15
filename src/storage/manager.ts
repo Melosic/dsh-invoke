@@ -8,6 +8,7 @@ import {
 } from './context.js';
 import { writeJsonAtomic } from './safe-write.js';
 import { removeAliasesByPromptId } from './alias-store.js';
+import { ht } from '../shared/host-messages.js';
 
 // ============ 类型定义 ============
 
@@ -156,9 +157,20 @@ function readStorageAt(filePath: string): PromptStorage | null {
 
 /**
  * 写入存储到指定路径（原子写入 + .bak 备份，见 safe-write.ts）
+ *
+ * 写失败时的缓存一致性：调用方沿用「读（缓存共享引用）→ 就地修改 → 写回」，
+ * 若 writeJsonAtomic 抛错（磁盘满/跨设备 rename/权限），主文件未变更、
+ * mtime 未变，但缓存对象已被就地修改——此时若保留缓存条目，
+ * 下次读会命中脏数据并把幽灵修改落盘。因此写失败必须清除该路径缓存，
+ * 强制下次从磁盘上的干净文件重新解析（丢弃未落盘的就地修改）。
  */
 function writeStorageAt(filePath: string, data: PromptStorage): void {
-  writeJsonAtomic(filePath, data);
+  try {
+    writeJsonAtomic(filePath, data);
+  } catch (err) {
+    storageCache.delete(filePath);
+    throw err;
+  }
   // 写穿透：同步缓存，避免下一次读重复解析
   const mtimeMs = mtimeOf(filePath);
   if (mtimeMs === null) {
@@ -341,7 +353,7 @@ export function addPrompt(
   cwd?: string | null
 ): Prompt {
   if (promptExistsInAny(prompt.id, cwd)) {
-    throw new Error(`提示词 ID "${prompt.id}" 已存在`);
+    throw new Error(ht('api.idExists', { id: prompt.id }));
   }
 
   const newPrompt: Prompt = {
