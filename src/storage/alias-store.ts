@@ -7,6 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
+import { writeJsonAtomic } from './safe-write.js';
 
 // ============ 类型定义 ============
 
@@ -46,21 +47,29 @@ function ensureAliasFile(): void {
   }
 }
 
-function readAliases(): AliasStore {
-  ensureAliasFile();
+/** 尝试解析别名存储；损坏返回 null */
+function tryParseAliases(file: string): AliasStore | null {
   try {
-    const raw = fs.readFileSync(ALIASES_FILE, 'utf-8');
-    const data = JSON.parse(raw) as AliasStore;
+    const data = JSON.parse(fs.readFileSync(file, 'utf-8')) as AliasStore;
     if (!Array.isArray(data.aliases)) data.aliases = [];
     return data;
   } catch {
-    return { version: 1, aliases: [] };
+    return null;
   }
+}
+
+function readAliases(): AliasStore {
+  ensureAliasFile();
+  const parsed = tryParseAliases(ALIASES_FILE);
+  if (parsed) return parsed;
+  // 主文件损坏：回退 .bak 备份，避免下次写入把唯一可恢复的副本冲掉
+  console.warn(`[dsh-invoke] 别名存储损坏: ${ALIASES_FILE}，尝试 .bak 备份回退`);
+  return tryParseAliases(`${ALIASES_FILE}.bak`) ?? { version: 1, aliases: [] };
 }
 
 function writeAliases(store: AliasStore): void {
   ensureAliasFile();
-  fs.writeFileSync(ALIASES_FILE, JSON.stringify(store, null, 2), 'utf-8');
+  writeJsonAtomic(ALIASES_FILE, store);
 }
 
 // ============ 别名 CRUD ============

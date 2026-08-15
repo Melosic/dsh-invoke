@@ -26,6 +26,29 @@ export const mockFs = {
     if (idx > 0) dirs.add(p.slice(0, idx));
     files.set(p, content);
   },
+  copyFileSync: (src: string, dest: string): void => {
+    const content = files.get(src);
+    if (content === undefined) {
+      const err: NodeJS.ErrnoException = new Error(
+        `ENOENT: no such file or directory, copy '${src}'`
+      );
+      err.code = 'ENOENT';
+      throw err;
+    }
+    files.set(dest, content);
+  },
+  renameSync: (from: string, to: string): void => {
+    const content = files.get(from);
+    if (content === undefined) {
+      const err: NodeJS.ErrnoException = new Error(
+        `ENOENT: no such file or directory, rename '${from}'`
+      );
+      err.code = 'ENOENT';
+      throw err;
+    }
+    files.delete(from);
+    files.set(to, content);
+  },
   /** 供测试检查当前文件系统内容 */
   __files: (): Map<string, string> => files,
   /** 供测试重置文件系统状态 */

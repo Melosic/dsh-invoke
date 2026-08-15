@@ -1,8 +1,16 @@
 // src/host/routes.ts
 // Prompt Vault 的 HTTP 路由层：将存储 CRUD 暴露给浏览器端 client。
 // 注册在 ctx.webServer 上，client 通过 fetch 访问同源 /api/dsh-invoke/*。
+//
+// 安全模型（统一安全门，见 add() 包装器）：
+//   1. Host 白名单（全部请求）—— 防 DNS rebinding：攻击者域名重解析到本机回环
+//   2. Origin 同源校验（写操作）—— 防 CSRF：恶意网页跨站 POST/PUT/DELETE
+//   3. 显式 cwd 白名单（全部请求）—— 防任意目录写入：?cwd=/body.cwd
+//      必须是已存在目录，且（注册表可用时）为 dsh 已注册的工作区
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { stat } from 'node:fs/promises';
+import * as path from 'path';
 import type { Context } from '@deepseek-ai/cordis';
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver';
 import {
@@ -59,6 +67,66 @@ function badRequest(res: ServerResponse, message: string): void {
   json(res, 400, { error: message });
 }
 
+function forbidden(res: ServerResponse, message = 'Forbidden'): void {
+  json(res, 403, { error: message });
+}
+
+// ============ 请求安全校验 ============
+
+/** 允许的 Host：本机名、回环与局域网字面地址（防 DNS rebinding） */
+const ALLOWED_HOST =
+  /^(?:localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|\[::1?\]|\[fe80:|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})(?::\d+)?$/i;
+
+function isAllowedHost(req: IncomingMessage): boolean {
+  return ALLOWED_HOST.test((req.headers.host ?? '').trim());
+}
+
+/**
+ * 写操作校验 Origin：存在时必须与 Host 同源（防 CSRF，含 text/plain 表单跨站提交）。
+ * GET/HEAD 无副作用不校验；无 Origin 的请求（curl/服务端调用）放行，
+ * 其风险已由 Host 白名单（防 rebinding）覆盖。
+ */
+function isSameOrigin(req: IncomingMessage): boolean {
+  if (req.method === 'GET' || req.method === 'HEAD') return true;
+  const origin = req.headers.origin;
+  if (origin === undefined) return true;
+  try {
+    return new URL(origin).host.toLowerCase() === (req.headers.host ?? '').toLowerCase();
+  } catch {
+    return false; // 形如 sandbox iframe 的 "null" origin
+  }
+}
+
+/** 运行时鸭子类型探测目录是否为已注册工作区；注册表不可用时返回 null（未知） */
+async function probeRegisteredWorkspace(ctx: Context, root: string): Promise<boolean | null> {
+  const registry = (ctx as { workspaceRegistry?: { resolveByPath(p: string): Promise<unknown> } })
+    .workspaceRegistry;
+  if (typeof registry?.resolveByPath !== 'function') return null;
+  try {
+    return (await registry.resolveByPath(root)) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 校验显式 cwd 是否在允许范围内：必须是已存在的目录，
+ * 且（注册表可用时）必须是 dsh 已注册的工作区。
+ * 防止任意目录写入原语（向 <任意路径>/.harness/prompts.json 投递文件）。
+ */
+async function isCwdAllowed(ctx: Context, raw: string | undefined | null): Promise<boolean> {
+  const trimmed = raw?.trim();
+  if (!trimmed) return true; // 未显式指定，使用全局初始化值
+  const resolved = path.resolve(trimmed);
+  try {
+    if (!(await stat(resolved)).isDirectory()) return false;
+  } catch {
+    return false;
+  }
+  const registered = await probeRegisteredWorkspace(ctx, resolved);
+  return registered !== false;
+}
+
 function serverError(res: ServerResponse, error: unknown): void {
   json(res, 500, { error: error instanceof Error ? error.message : 'Internal Server Error' });
 }
@@ -112,8 +180,25 @@ function queryCwd(url: string | undefined): string | undefined {
 export function registerRoutes(ctx: Context): () => void {
   const disposers: Array<() => void> = [];
 
+  // 统一安全门：所有路由先过 Host / Origin / cwd 校验再进业务 handler
   const add = (route: WebRoute) => {
-    disposers.push(ctx.webServer.register(route));
+    disposers.push(
+      ctx.webServer.register({
+        ...route,
+        handler: async (req, res) => {
+          if (!isAllowedHost(req)) {
+            return forbidden(res, '请求被拒绝：Host 不在允许范围（仅本机/局域网地址）');
+          }
+          if (!isSameOrigin(req)) {
+            return forbidden(res, '请求被拒绝：跨站请求（Origin 校验失败）');
+          }
+          if (!(await isCwdAllowed(ctx, queryCwd(req.url)))) {
+            return badRequest(res, '工作目录（cwd）不在允许范围内');
+          }
+          return route.handler(req, res);
+        },
+      })
+    );
   };
 
   // ---- 提示词：列表 / 新增 ----
@@ -138,6 +223,9 @@ export function registerRoutes(ctx: Context): () => void {
           > & { cwd?: string };
           if (!body.id || !body.title || !body.body) {
             return badRequest(res, '缺少必填字段（id / title / body）');
+          }
+          if (!(await isCwdAllowed(ctx, body.cwd ?? queryCwd(req.url)))) {
+            return badRequest(res, '工作目录（cwd）不在允许范围内');
           }
           const created = addPrompt(body, body.cwd?.trim() || queryCwd(req.url));
           return json(res, 201, created);
@@ -183,6 +271,9 @@ export function registerRoutes(ctx: Context): () => void {
           const body = (await readJsonBody(req)) as Partial<
             Omit<Prompt, 'id' | 'builtin' | 'createdAt'>
           > & { cwd?: string };
+          if (!(await isCwdAllowed(ctx, body.cwd ?? cwd))) {
+            return badRequest(res, '工作目录（cwd）不在允许范围内');
+          }
           const updated = updatePrompt(
             id,
             body,
@@ -226,6 +317,9 @@ export function registerRoutes(ctx: Context): () => void {
           const body = (await readJsonBody(req)) as { alias?: string; promptId?: string; cwd?: string };
           if (!body.alias || !body.promptId) {
             return badRequest(res, '缺少必填字段（alias / promptId）');
+          }
+          if (!(await isCwdAllowed(ctx, body.cwd ?? queryCwd(req.url)))) {
+            return badRequest(res, '工作目录（cwd）不在允许范围内');
           }
           const cwd = body.cwd?.trim() || queryCwd(req.url);
           if (!getPromptById(body.promptId, cwd)) {
@@ -282,6 +376,9 @@ export function registerRoutes(ctx: Context): () => void {
           if (!body.name || !body.name.trim()) {
             return badRequest(res, '分类名称不能为空');
           }
+          if (!(await isCwdAllowed(ctx, body.cwd ?? queryCwd(req.url)))) {
+            return badRequest(res, '工作目录（cwd）不在允许范围内');
+          }
           addCustomCategory(body.name.trim(), body.cwd?.trim() || queryCwd(req.url));
           return json(res, 201, { success: true });
         } catch (error) {
@@ -316,6 +413,9 @@ export function registerRoutes(ctx: Context): () => void {
         };
         if (typeof body.content !== 'string' || !body.content) {
           return badRequest(res, '缺少导入内容');
+        }
+        if (!(await isCwdAllowed(ctx, body.cwd ?? queryCwd(req.url)))) {
+          return badRequest(res, '工作目录（cwd）不在允许范围内');
         }
         const cwd = body.cwd?.trim() || queryCwd(req.url);
         const result: ImportResult =
@@ -357,19 +457,9 @@ export function registerRoutes(ctx: Context): () => void {
       const cwd = queryCwd(req.url);
       const { workspaceRoot, projectStoragePath } = resolveStorageContext(cwd);
 
-      let registered: boolean | null = null;
-      if (workspaceRoot) {
-        // 运行时鸭子类型探测，避免硬依赖 workspaceRegistry 服务
-        const registry = (ctx as { workspaceRegistry?: { resolveByPath(p: string): Promise<unknown> } })
-          .workspaceRegistry;
-        if (typeof registry?.resolveByPath === 'function') {
-          try {
-            registered = (await registry.resolveByPath(workspaceRoot)) !== undefined;
-          } catch {
-            registered = false; // 目录不存在等解析失败
-          }
-        }
-      }
+      const registered = workspaceRoot
+        ? await probeRegisteredWorkspace(ctx, workspaceRoot)
+        : null;
 
       return json(res, 200, {
         workspaceRoot,

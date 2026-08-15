@@ -71,12 +71,14 @@ function tryRegisterSlotEntry(ctx: Context): boolean {
     return false;
   }
   try {
-    slots.inject('sidebar.footer.action', () => {
+    let disposeEntry: (() => void) | null = null;
+    const stopInject = slots.inject('sidebar.footer.action', () => {
       try {
-        slots.register(
+        const dispose = slots.register(
           { name: 'sidebar.footer.action', id: 'dsh-invoke', order: 10, label: 'Prompt Vault' },
           SidebarEntryButton
         );
+        if (typeof dispose === 'function') disposeEntry = dispose as () => void;
         // slot 入口接管后，DOM 兜底按钮退场（observer 由 disposer 断开）
         document.getElementById(SIDEBAR_BTN_ID)?.remove();
         stopDomFallback();
@@ -85,6 +87,19 @@ function tryRegisterSlotEntry(ctx: Context): boolean {
         console.warn(`${C_LOG_PREFIX} slot 注册失败，保持 DOM 注入兜底`, e);
       }
     });
+    // 卸载/热重载时注销 slot 入口与 inject 等待，避免按钮残留与回调悬挂
+    ctx.effect(() => () => {
+      try {
+        if (typeof stopInject === 'function') stopInject();
+      } catch {
+        /* 忽略清理失败 */
+      }
+      try {
+        disposeEntry?.();
+      } catch {
+        /* 忽略清理失败 */
+      }
+    }, 'dsh-invoke.slot-entry');
     return true;
   } catch (e) {
     console.warn(`${C_LOG_PREFIX} slots.inject 不可用，走 DOM 注入兜底`, e);

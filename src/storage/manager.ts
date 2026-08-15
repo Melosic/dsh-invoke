@@ -6,6 +6,7 @@ import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
 import {
   resolveStorageContext
 } from './context.js';
+import { writeJsonAtomic } from './safe-write.js';
 import { removeAliasesByPromptId } from './alias-store.js';
 
 // ============ 类型定义 ============
@@ -87,16 +88,6 @@ function ensureStorageFile(): void {
 }
 
 /**
- * 确保指定路径的存储目录存在
- */
-function ensureDirFor(filePath: string): void {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
-
-/**
  * 规范化存储数据结构（补齐默认字段）
  */
 function normalizeStorage(data: Partial<PromptStorage>): PromptStorage {
@@ -109,26 +100,32 @@ function normalizeStorage(data: Partial<PromptStorage>): PromptStorage {
   return result;
 }
 
-/**
- * 从指定路径读取存储（不存在则返回空）
- */
-function readStorageAt(filePath: string): PromptStorage | null {
-  if (!fs.existsSync(filePath)) return null;
+/** 尝试解析存储文件；损坏/不存在返回 null */
+function tryParseStorageAt(filePath: string): PromptStorage | null {
   try {
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    return normalizeStorage(JSON.parse(raw));
+    return normalizeStorage(JSON.parse(fs.readFileSync(filePath, 'utf-8')));
   } catch {
-    console.warn(`[dsh-invoke] 存储文件损坏: ${filePath}`);
     return null;
   }
 }
 
 /**
- * 写入存储到指定路径
+ * 从指定路径读取存储（不存在则返回空）
+ * 主文件损坏时回退 .bak 备份，避免下次写入把唯一可恢复的副本冲掉
+ */
+function readStorageAt(filePath: string): PromptStorage | null {
+  if (!fs.existsSync(filePath)) return null;
+  const parsed = tryParseStorageAt(filePath);
+  if (parsed) return parsed;
+  console.warn(`[dsh-invoke] 存储文件损坏: ${filePath}，尝试 .bak 备份回退`);
+  return tryParseStorageAt(`${filePath}.bak`);
+}
+
+/**
+ * 写入存储到指定路径（原子写入 + .bak 备份，见 safe-write.ts）
  */
 function writeStorageAt(filePath: string, data: PromptStorage): void {
-  ensureDirFor(filePath);
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  writeJsonAtomic(filePath, data);
 }
 
 /**

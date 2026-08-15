@@ -7,7 +7,7 @@ import {
   importFromYAML
 } from '../src/engine/import-export';
 import { readStorage, writeStorage, getAllCategories } from '../src/storage/manager';
-import type { Prompt, PromptStorage } from '../src/storage/manager';
+import type { Prompt, PromptStorage, Variable } from '../src/storage/manager';
 import { mockFs } from './helpers/mockFs';
 
 jest.mock('@deepseek-ai/dsh-home-paths', () => ({
@@ -104,6 +104,98 @@ describe('importFromJSON', () => {
 
     const storage = readStorage();
     expect(storage.prompts.map(p => p.id)).toEqual(['b']);
+  });
+
+  test('merge 模式：无效条目被过滤，不进入存储', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'a' })]));
+    const imported = {
+      version: 1,
+      categories: ['x'],
+      prompts: [
+        makePrompt({ id: 'b' }),
+        { id: '', title: '空 ID' },
+        'not-an-object',
+        { nope: 1 }
+      ]
+    };
+    const result = importFromJSON(JSON.stringify(imported), 'merge');
+    expect(result.success).toBe(true);
+    expect(result.added).toBe(1);
+    expect(result.skipped).toBe(3);
+    expect(result.message).toContain('过滤无效条目 3 条');
+
+    const storage = readStorage();
+    expect(storage.prompts.map(p => p.id).sort()).toEqual(['a', 'b']);
+  });
+
+  test('overwrite 模式：version 不取导入值，无效条目被过滤', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'a' })]));
+    const imported = {
+      version: 999,
+      categories: 'not-array',
+      prompts: [makePrompt({ id: 'b' }), { nope: 1 }]
+    };
+    const result = importFromJSON(JSON.stringify(imported), 'overwrite');
+    expect(result.success).toBe(true);
+    expect(result.added).toBe(1);
+    expect(result.skipped).toBe(1);
+
+    const storage = readStorage();
+    expect(storage.version).toBe(1);
+    expect(storage.prompts.map(p => p.id)).toEqual(['b']);
+  });
+
+  test('变量数组中的非法项被过滤，提示词保留', () => {
+    const imported = makeStorage([
+      makePrompt({
+        id: 'v1',
+        variables: [{ name: 'code', type: 'text' }, 'bad' as unknown as Variable]
+      })
+    ]);
+    const result = importFromJSON(JSON.stringify(imported), 'overwrite');
+    expect(result.success).toBe(true);
+    expect(result.added).toBe(1);
+
+    const storage = readStorage();
+    expect(storage.prompts[0].variables).toHaveLength(1);
+    expect(storage.prompts[0].variables[0].name).toBe('code');
+  });
+
+  test('merge 模式：导入的 customCategories 并入自定义分类', () => {
+    writeStorage(makeStorage([], ['已有分类']));
+    const imported: PromptStorage = {
+      version: 1,
+      categories: [],
+      customCategories: ['项目分类'],
+      prompts: [makePrompt({ id: 'x' })]
+    };
+    importFromJSON(JSON.stringify(imported), 'merge');
+    expect(getAllCategories()).toContain('项目分类');
+  });
+});
+
+describe('原子写入与损坏回退', () => {
+  beforeEach(() => mockFs.__reset());
+
+  test('二次写入产生 .bak 备份，主文件始终为最新版', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'a' })]));
+    writeStorage(makeStorage([makePrompt({ id: 'b' })]));
+
+    const files = mockFs.__files();
+    const main = JSON.parse(files.get('/tmp/dsh-invoke-test/prompts.user.json')!) as PromptStorage;
+    expect(main.prompts.map(p => p.id)).toEqual(['b']);
+    const bak = JSON.parse(files.get('/tmp/dsh-invoke-test/prompts.user.json.bak')!) as PromptStorage;
+    expect(bak.prompts.map(p => p.id)).toEqual(['a']);
+  });
+
+  test('主文件损坏时读取回退 .bak 备份', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'a' })]));
+    writeStorage(makeStorage([makePrompt({ id: 'b' })]));
+    // 模拟崩溃截断
+    mockFs.__files().set('/tmp/dsh-invoke-test/prompts.user.json', '{broken');
+
+    const storage = readStorage();
+    expect(storage.prompts.map(p => p.id)).toEqual(['a']);
   });
 });
 
