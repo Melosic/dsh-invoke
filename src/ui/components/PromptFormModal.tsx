@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Prompt, Variable, addPrompt, updatePrompt } from '../../client/api.js';
 import { injectStyles } from '../styles.js';
 import { t } from '../i18n.js';
+import { Select } from './Select.js';
 
 /** 生成提示词 ID：优先 crypto.randomUUID（同毫秒并发也不冲突），降级随机拼合 */
 function generatePromptId(): string {
@@ -82,10 +83,7 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
   };
 
   const removeVariable = (index: number) => {
-    if (variables.length <= 1) {
-      setError(t('form.keepOneVar'));
-      return;
-    }
+    // 变量为可选：允许删到 0 行（提交时空名行会被过滤）
     setVariables(variables.filter((_, i) => i !== index));
   };
 
@@ -177,16 +175,12 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
 
         <div className="pv-field">
           <label className="pv-label" htmlFor="pv-f-category">{t('form.categoryLabel')}<span className="pv-required">*</span></label>
-          <select
-            id="pv-f-category"
-            className="pv-select"
+          <Select
+            ariaLabel={t('form.categoryLabel')}
             value={safeCategory}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            {categoryOptions.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
+            options={categoryOptions.map(cat => ({ value: cat, label: cat }))}
+            onChange={(v) => setCategory(v)}
+          />
           <div className="pv-hint">{t('form.categoryHint')}</div>
         </div>
 
@@ -232,14 +226,15 @@ export const PromptFormModal: React.FC<PromptFormModalProps> = ({
                 onChange={(e) => updateVariable(index, 'name', e.target.value)}
                 placeholder={t('form.varNamePlaceholder')}
               />
-              <select
-                className="pv-select"
+              <Select
+                ariaLabel={t('form.varTypeLabel')}
                 value={v.type}
-                onChange={(e) => updateVariable(index, 'type', e.target.value)}
-              >
-                <option value="text">{t('form.varTypeText')}</option>
-                <option value="textarea">{t('form.varTypeTextarea')}</option>
-              </select>
+                options={[
+                  { value: 'text', label: t('form.varTypeText') },
+                  { value: 'textarea', label: t('form.varTypeTextarea') },
+                ]}
+                onChange={(val) => updateVariable(index, 'type', val)}
+              />
               <button
                 className="pv-btn-compact danger"
                 onClick={() => removeVariable(index)}
