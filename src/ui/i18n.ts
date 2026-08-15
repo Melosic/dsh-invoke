@@ -318,7 +318,14 @@ export function getLocale(): LocaleId {
  * ctx.locale 不可用时静默降级为内置 zh，不影响插件加载。
  */
 export function setupI18n(ctx: unknown): void {
-  const loc = (ctx as { locale?: Partial<LocaleService> } | null)?.locale;
+  // 注意：cordis 懒代理下，未 inject 声明的服务属性访问本身即抛错
+  // （"cannot get property 'locale' without inject"），必须整体 try/catch 降级
+  let loc: Partial<LocaleService> | undefined;
+  try {
+    loc = (ctx as { locale?: Partial<LocaleService> } | null)?.locale;
+  } catch {
+    return;
+  }
   if (!loc || typeof loc.register !== 'function' || typeof loc.bind !== 'function') return;
   try {
     loc.register('dsh-invoke', { zh, en });

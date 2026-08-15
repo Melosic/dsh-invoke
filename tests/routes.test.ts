@@ -359,3 +359,58 @@ describe('导入 / 导出路由', () => {
     expect(r.raw).toContain('rt-imp-1');
   });
 });
+
+describe('workspaceRegistry 服务探测容错', () => {
+  afterEach(() => {
+    // 清理本组注入的 getter，避免影响其他用例
+    delete (fakeCtx as Record<string, unknown>).workspaceRegistry;
+  });
+
+  test('属性访问抛出（未启动懒代理）→ 降级为未知，不拖垮请求', async () => {
+    Object.defineProperty(fakeCtx, 'workspaceRegistry', {
+      configurable: true,
+      get() {
+        throw new Error('service workspaceRegistry is not ready');
+      },
+    });
+    // ?cwd= 路径触发 isCwdAllowed → probeRegisteredWorkspace；
+    // 根锚点为 null（beforeAll 设置），降级档放行已存在目录
+    const r = await call(PROMPTS, 'GET', `/api/dsh-invoke/prompts${WS_Q()}`);
+    expect(r.status).toBe(200);
+    expect(Array.isArray(r.body?.prompts)).toBe(true);
+  });
+
+  test('resolveByPath 属性访问抛出（懒代理）→ 降级为未知，不拖垮请求', async () => {
+    const lazy = {};
+    Object.defineProperty(lazy, 'resolveByPath', {
+      get() {
+        throw new Error('cannot access resolveByPath before start');
+      },
+    });
+    Object.defineProperty(fakeCtx, 'workspaceRegistry', {
+      configurable: true,
+      value: lazy,
+    });
+    const r = await call(PROMPTS, 'GET', `/api/dsh-invoke/prompts${WS_Q()}`);
+    expect(r.status).toBe(200);
+    expect(Array.isArray(r.body?.prompts)).toBe(true);
+  });
+
+  test('注册表可用且目录未注册 → cwd 被拒（最强档不误放）', async () => {
+    Object.defineProperty(fakeCtx, 'workspaceRegistry', {
+      configurable: true,
+      value: { resolveByPath: async () => undefined },
+    });
+    const r = await call(PROMPTS, 'GET', `/api/dsh-invoke/prompts${WS_Q()}`);
+    expect(r.status).toBe(400);
+  });
+
+  test('注册表可用且目录已注册 → 放行', async () => {
+    Object.defineProperty(fakeCtx, 'workspaceRegistry', {
+      configurable: true,
+      value: { resolveByPath: async () => ({ id: 'ws-1' }) },
+    });
+    const r = await call(PROMPTS, 'GET', `/api/dsh-invoke/prompts${WS_Q()}`);
+    expect(r.status).toBe(200);
+  });
+});

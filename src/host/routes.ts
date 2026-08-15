@@ -107,13 +107,22 @@ function isSameOrigin(req: IncomingMessage): boolean {
   }
 }
 
-/** 运行时鸭子类型探测目录是否为已注册工作区；注册表不可用时返回 null（未知） */
+/**
+ * 运行时鸭子类型探测目录是否为已注册工作区；注册表不可用时返回 null（未知）。
+ * 注意：宿主的 ctx.workspaceRegistry 可能是未启动服务的懒代理，属性访问本身
+ * 即可能抛出——该情况属"未知"（null，回退次级校验），而非"未注册"（false）。
+ */
 async function probeRegisteredWorkspace(ctx: Context, root: string): Promise<boolean | null> {
-  const registry = (ctx as { workspaceRegistry?: { resolveByPath(p: string): Promise<unknown> } })
-    .workspaceRegistry;
-  if (typeof registry?.resolveByPath !== 'function') return null;
+  let registry: { resolveByPath(p: string): Promise<unknown> } | undefined;
   try {
-    return (await registry.resolveByPath(root)) !== undefined;
+    registry = (ctx as { workspaceRegistry?: { resolveByPath(p: string): Promise<unknown> } })
+      .workspaceRegistry;
+    if (typeof registry?.resolveByPath !== 'function') return null;
+  } catch {
+    return null;
+  }
+  try {
+    return (await registry!.resolveByPath(root)) !== undefined;
   } catch {
     return false;
   }

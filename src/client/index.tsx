@@ -68,7 +68,13 @@ function findSettingsButton(): HTMLElement | null {
  * 任何失败都静默降级到 DOM 注入方案。
  */
 function tryRegisterSlotEntry(ctx: Context): boolean {
-  const slots = (ctx as { slots?: SlotsService }).slots;
+  // cordis 懒代理下未 inject 声明的服务属性访问即抛错，需 try/catch 后走 DOM 兜底
+  let slots: SlotsService | undefined;
+  try {
+    slots = (ctx as { slots?: SlotsService }).slots;
+  } catch {
+    return false;
+  }
   if (!slots || typeof slots.inject !== 'function' || typeof slots.register !== 'function') {
     return false;
   }
