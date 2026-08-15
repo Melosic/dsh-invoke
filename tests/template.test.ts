@@ -26,6 +26,17 @@ describe('renderTemplate', () => {
   test('空值替换为空字符串', () => {
     expect(renderTemplate('[{{x}}]', { x: '' })).toBe('[]');
   });
+
+  test('变量值中的 $& 等替换模式不被解释', () => {
+    expect(renderTemplate('{{x}}', { x: '$&' })).toBe('$&');
+    expect(renderTemplate('{{x}}', { x: '$1' })).toBe('$1');
+    expect(renderTemplate('a{{x}}b', { x: '$`' })).toBe('a$`b');
+  });
+
+  test('变量名含正则元字符时仍按字面量匹配', () => {
+    expect(renderTemplate('[{{a.b}}]', { 'a.b': 'X' })).toBe('[X]');
+    expect(renderTemplate('[{{a*b}}]', { 'a*b': 'Y' })).toBe('[Y]');
+  });
 });
 
 describe('extractVariablesFromBody', () => {

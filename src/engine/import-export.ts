@@ -3,9 +3,9 @@
 import * as yaml from 'js-yaml';
 import {
   PromptStorage,
-  readStorage,
-  writeStorage,
-  getMergedStorage
+  getMergedStorage,
+  getActiveLayerStorage,
+  writeToActiveLayer
 } from '../storage/manager.js';
 
 // ============ 类型定义 ============
@@ -39,6 +39,7 @@ export function exportToYAML(): string {
 
 /**
  * 校验并写入导入的数据（JSON 与 YAML 共用）
+ * 写入目标与新增提示词策略一致：有工作区写项目级，否则写用户级
  * @param data 解析后的存储对象
  * @param mode 导入模式：'overwrite' 覆盖全部 | 'merge' 合并（保留已有，添加新的）
  */
@@ -53,7 +54,7 @@ function importStorage(data: PromptStorage, mode: 'overwrite' | 'merge'): Import
   }
 
   if (mode === 'overwrite') {
-    writeStorage(data);
+    writeToActiveLayer(data);
     return {
       success: true,
       message: `导入成功，共 ${data.prompts.length} 条提示词`,
@@ -62,7 +63,7 @@ function importStorage(data: PromptStorage, mode: 'overwrite' | 'merge'): Import
     };
   }
 
-  const current = readStorage();
+  const current = getActiveLayerStorage();
 
   const mergedCategories = [...current.categories];
   const mergedCustomCategories = [...current.customCategories];
@@ -95,7 +96,7 @@ function importStorage(data: PromptStorage, mode: 'overwrite' | 'merge'): Import
     prompts: mergedPrompts
   };
 
-  writeStorage(newStorage);
+  writeToActiveLayer(newStorage);
 
   return {
     success: true,
