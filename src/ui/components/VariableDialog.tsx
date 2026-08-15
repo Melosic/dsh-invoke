@@ -6,6 +6,10 @@ import { CopyIcon, CheckIcon, InfoIcon } from '../icons.js';
 import { injectStyles } from '../styles.js';
 import { t, DictKey } from '../i18n.js';
 
+/** 空值字典的模块级稳定引用：作为默认参数时避免每次渲染新建对象，
+ *  触发下方初始化 effect 反复重置 values（表现为输入框无法输入/粘贴） */
+const EMPTY_VALUES: Record<string, string> = {};
+
 interface VariableDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -28,8 +32,8 @@ export const VariableDialog: React.FC<VariableDialogProps> = ({
   title,
   description,
   variables,
-  initialValues = {},
-  autoExtractValues = {},
+  initialValues = EMPTY_VALUES,
+  autoExtractValues = EMPTY_VALUES,
   extractMessageKey = '',
   extractMessageParams
 }) => {
