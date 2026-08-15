@@ -100,11 +100,11 @@ If you want to develop the plugin locally or run it without publishing to npm:
    dsh --profile web --port 8080
    ```
 
-Open `http://127.0.0.1:8080/` in your browser. The **Prompt Vault** entry button should appear in the sidebar automatically.
+Open `http://127.0.0.1:8080/` in your browser. The **Prompt Vault** entry button should appear in the sidebar automatically, directly above the Settings button.
 
 ## Quick Start
 
-1. Start Harness; the "Prompt Vault" entry button is injected into the sidebar automatically.
+1. Start Harness; the "Prompt Vault" entry button is injected into the sidebar automatically, directly above the Settings button.
 2. Click the entry to open the panel. Browse prompts by clicking a category, or use the search box to locate one quickly.
 3. Use a prompt: click "Copy" on a card → fill variables → click "Copy to clipboard" → paste it into the input and send.
 4. Manage prompts: click "Add" to create a custom prompt, or use "Edit" / "Delete" on cards.
