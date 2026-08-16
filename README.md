@@ -16,6 +16,8 @@ The plugin runs as a **Host + Client two-part plugin**: the Host side (Node) reg
 - **Quick invoke (copy to clipboard)**: click "Copy" → fill variables → copy → paste and send. Independent of Harness's internal DOM, 100% compatible.
 - **Variable substitution**: Mustache-style `{{var}}` placeholders, filled interactively via a dialog on invoke. (Auto-extraction from the editor selection is planned — the extraction engine is ready, waiting for a selection API from the host.)
 - **Category tree + live search**: left-hand category filter, top search box with real-time filtering (title / description / tags / body), with matched-keyword highlighting.
+- **Hover preview**: hover any card or row for 250ms to read the full prompt body in a floating popup — no clicking needed, and the popup never blocks what you're about to click.
+- **Compact / comfortable view toggle**: switch between the card grid and a dense single-line list from the search bar; the preference is remembered per browser.
 - **Light / dark theme**: follows Harness's `data-ds-dark-theme` mechanism automatically, with in-panel manual override.
 - **Two-layer storage merge**: user-level global storage + project-level storage, project-level wins.
 - **Import / export**: batch JSON / YAML import (merge / overwrite modes), export backup.
