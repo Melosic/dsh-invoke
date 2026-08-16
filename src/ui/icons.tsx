@@ -167,6 +167,28 @@ export const LinkIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
+/** 紧凑列表视图（Feather list 风格） */
+export const ListIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <line x1="8" y1="6" x2="21" y2="6" />
+    <line x1="8" y1="12" x2="21" y2="12" />
+    <line x1="8" y1="18" x2="21" y2="18" />
+    <line x1="3" y1="6" x2="3.01" y2="6" />
+    <line x1="3" y1="12" x2="3.01" y2="12" />
+    <line x1="3" y1="18" x2="3.01" y2="18" />
+  </IconBase>
+);
+
+/** 舒适网格视图（Feather grid 风格） */
+export const GridIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="3" y="3" width="7" height="7" />
+    <rect x="14" y="3" width="7" height="7" />
+    <rect x="14" y="14" width="7" height="7" />
+    <rect x="3" y="14" width="7" height="7" />
+  </IconBase>
+);
+
 export const XIcon: React.FC<IconProps> = ({ size, className }) => (
   <FillBase size={size} className={className}>
     <path d="M3.34 2.26a.9.9 0 0 0-1.08 1.4L6.74 8.3l-4.48 4.44a.9.9 0 1 0 1.26 1.28L8 9.58l4.48 4.44a.9.9 0 1 0 1.26-1.28L9.26 8.3l4.48-4.44a.9.9 0 1 0-1.26-1.28L8 7.02 3.34 2.26z" />

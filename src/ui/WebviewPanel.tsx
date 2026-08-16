@@ -16,6 +16,8 @@ import {
   SunIcon,
   BookmarkIcon,
   LinkIcon,
+  ListIcon,
+  GridIcon,
   XIcon
 } from './icons.js';
 import { useTheme, ThemeMode } from './theme.js';
@@ -46,6 +48,48 @@ import { AliasDialog } from './components/AliasDialog.js';
 /** 由 esbuild define 注入（scripts/build-client.mjs 读取 package.json 版本），保证版本号单源 */
 declare const __DSH_INVOKE_VERSION__: string;
 
+// ============ 视图模式（紧凑/舒适）与悬停速览常量 ============
+
+type ViewMode = 'compact' | 'comfortable';
+
+const VIEW_STORAGE_KEY = 'dsh-invoke:view-mode';
+
+/** 悬停速览延迟（ms）：对齐 Voyager 提示词库的 250ms 交互 */
+const HOVER_PREVIEW_DELAY_MS = 250;
+
+/** 速览浮窗宽度（与 styles.ts 的 .pv-preview width 保持一致，用于视口内钳位） */
+const PREVIEW_WIDTH = 360;
+/** 速览浮窗预估最大高度（标题 + 描述 + 300px 正文 + 内边距） */
+const PREVIEW_MAX_HEIGHT = 360;
+/** 浮窗与视口边缘的最小间距 */
+const PREVIEW_VIEWPORT_MARGIN = 16;
+
+function loadViewMode(): ViewMode {
+  try {
+    return localStorage.getItem(VIEW_STORAGE_KEY) === 'compact' ? 'compact' : 'comfortable';
+  } catch {
+    return 'comfortable';
+  }
+}
+
+function saveViewMode(mode: ViewMode): void {
+  try {
+    localStorage.setItem(VIEW_STORAGE_KEY, mode);
+  } catch {
+    // 隐私模式等场景下 localStorage 不可用：仅本次会话生效
+  }
+}
+
+/** 计算速览浮窗位置：光标右下方，越界时向视口内钳位 */
+function getPreviewPosition(x: number, y: number): { left: number; top: number } {
+  const m = PREVIEW_VIEWPORT_MARGIN;
+  const w = Math.min(PREVIEW_WIDTH, window.innerWidth - 2 * m);
+  return {
+    left: Math.max(m, Math.min(x + 14, window.innerWidth - w - m)),
+    top: Math.max(m, Math.min(y + 14, window.innerHeight - PREVIEW_MAX_HEIGHT - m))
+  };
+}
+
 export interface WebviewPanelProps {
   /** 预留：可选获取编辑器选中文本的回调（浏览器端暂不注入） */
   getSelectedText?: () => string | null;
@@ -68,6 +112,13 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
 
   // 卡片展开状态（记录展开的 prompt id 集合）
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // 视图模式：紧凑列表 / 舒适网格（localStorage 持久化）
+  const [viewMode, setViewMode] = useState<ViewMode>(loadViewMode);
+
+  // 悬停速览：延迟 250ms 后在光标附近浮窗展示完整正文
+  const [preview, setPreview] = useState<{ prompt: Prompt; x: number; y: number } | null>(null);
+  const previewTimer = useRef<number | null>(null);
 
   // 变量对话框状态
   const [isVarDialogOpen, setIsVarDialogOpen] = useState(false);
@@ -350,6 +401,43 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
     });
   };
 
+  // ============ 视图模式切换 ============
+
+  const toggleViewMode = () => {
+    setViewMode(prev => {
+      const next: ViewMode = prev === 'compact' ? 'comfortable' : 'compact';
+      saveViewMode(next);
+      return next;
+    });
+  };
+
+  // ============ 悬停速览 ============
+
+  const clearPreviewTimer = () => {
+    if (previewTimer.current !== null) {
+      window.clearTimeout(previewTimer.current);
+      previewTimer.current = null;
+    }
+  };
+
+  /** 关闭速览浮窗并取消未触发的定时器 */
+  const closePreview = () => {
+    clearPreviewTimer();
+    setPreview(null);
+  };
+
+  /** 悬停进入卡片/列表行：250ms 后在光标附近弹出速览 */
+  const openPreviewLater = (prompt: Prompt, e: React.MouseEvent) => {
+    clearPreviewTimer();
+    const { clientX: x, clientY: y } = e;
+    previewTimer.current = window.setTimeout(() => {
+      setPreview({ prompt, x, y });
+    }, HOVER_PREVIEW_DELAY_MS);
+  };
+
+  // 卸载时清理定时器
+  useEffect(() => () => clearPreviewTimer(), []);
+
   // ============ 导出下拉 ============
 
   const handleExportClick = (format: 'json' | 'yaml') => {
@@ -413,11 +501,23 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            <button
+              className="pv-icon-btn pv-view-toggle"
+              onClick={toggleViewMode}
+              title={viewMode === 'compact' ? t('view.toComfortable') : t('view.toCompact')}
+              aria-label={viewMode === 'compact' ? t('view.toComfortable') : t('view.toCompact')}
+              aria-pressed={viewMode === 'compact'}
+            >
+              {viewMode === 'compact' ? <GridIcon size={15} /> : <ListIcon size={15} />}
+            </button>
             <span className="pv-stats">{t('search.stats', { count: filteredPrompts.length })}</span>
           </div>
 
-          {/* 卡片网格 */}
-          <div className="pv-grid">
+          {/* 列表区：舒适网格 / 紧凑列表 */}
+          <div
+            className={viewMode === 'compact' ? 'pv-grid pv-grid-compact' : 'pv-grid'}
+            onScroll={closePreview}
+          >
             {filteredPrompts.length === 0 ? (
               <div className="pv-empty">
                 <div className="pv-empty-icon">
@@ -435,11 +535,85 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
             ) : (
               filteredPrompts.map(prompt => {
                 const aliasEntry = aliasByPromptId.get(prompt.id) ?? null;
+                // 紧凑列表：单行（标题 + 标签 + 悬停操作），悬停速览看全文
+                if (viewMode === 'compact') {
+                  return (
+                    <div
+                      key={prompt.id}
+                      className="pv-row"
+                      onMouseEnter={(e) => openPreviewLater(prompt, e)}
+                      onMouseLeave={closePreview}
+                    >
+                      <span className="pv-row-title">{highlightText(prompt.title, 't')}</span>
+                      <div className="pv-row-meta">
+                        {aliasEntry && (
+                          <span
+                            className="pv-tag pv-tag-alias"
+                            role="button"
+                            tabIndex={0}
+                            title={t('card.aliasTagTitle')}
+                            onClick={() => setAliasTarget(prompt)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setAliasTarget(prompt);
+                              }
+                            }}
+                          >
+                            /{aliasEntry.alias}
+                          </span>
+                        )}
+                        {prompt.tags.slice(0, 3).map(tag => (
+                          <span key={tag} className="pv-tag">{tag}</span>
+                        ))}
+                        {prompt.builtin && (
+                          <span className="pv-tag pv-tag-builtin">{t('card.builtin')}</span>
+                        )}
+                      </div>
+                      <div className="pv-row-actions" onMouseEnter={closePreview}>
+                        <button
+                          className="pv-card-action-btn"
+                          onClick={() => handleCopy(prompt)}
+                          title={t('card.copy')}
+                        >
+                          <CopyIcon size={13} />
+                        </button>
+                        <button
+                          className="pv-card-action-btn"
+                          onClick={() => setAliasTarget(prompt)}
+                          title={aliasEntry ? t('card.aliasEdit', { alias: aliasEntry.alias }) : t('card.aliasSet')}
+                        >
+                          <LinkIcon size={13} />
+                        </button>
+                        <button
+                          className="pv-card-action-btn"
+                          onClick={() => handleEdit(prompt)}
+                          title={t('common.edit')}
+                        >
+                          <EditIcon size={13} />
+                        </button>
+                        <button
+                          className="pv-card-action-btn danger"
+                          onClick={() => handleDelete(prompt)}
+                          title={t('card.deleteTitle')}
+                        >
+                          <DeleteIcon size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+                // 舒适网格：原有卡片
                 return (
-                <div key={prompt.id} className="pv-card">
+                <div
+                  key={prompt.id}
+                  className="pv-card"
+                  onMouseEnter={(e) => openPreviewLater(prompt, e)}
+                  onMouseLeave={closePreview}
+                >
                   <div className="pv-card-header">
                     <span className="pv-card-title">{highlightText(prompt.title, 't')}</span>
-                    <div className="pv-card-actions">
+                    <div className="pv-card-actions" onMouseEnter={closePreview}>
                       <button
                         className="pv-card-action-btn"
                         onClick={() => setAliasTarget(prompt)}
@@ -497,6 +671,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                     role="button"
                     tabIndex={0}
                     aria-expanded={expandedIds.has(prompt.id)}
+                    onMouseEnter={closePreview}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
@@ -568,6 +743,21 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
           v{__DSH_INVOKE_VERSION__} · {t('statusbar.count', { count: prompts.length })}
         </span>
       </div>
+
+      {/* 悬停速览浮窗：固定定位，pointer-events: none 不遮挡下层交互 */}
+      {preview && (
+        <div
+          className="pv-preview"
+          role="tooltip"
+          style={getPreviewPosition(preview.x, preview.y)}
+        >
+          <div className="pv-preview-title">{preview.prompt.title}</div>
+          {preview.prompt.description && (
+            <div className="pv-preview-desc">{preview.prompt.description}</div>
+          )}
+          <div className="pv-preview-body">{preview.prompt.body}</div>
+        </div>
+      )}
 
       {/* 表单弹窗 */}
       <PromptFormModal

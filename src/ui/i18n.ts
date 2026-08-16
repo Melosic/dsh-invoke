@@ -34,6 +34,12 @@ const zh = {
   'empty.noMatchDesc': '换个关键词或分类试试',
   'empty.noneDesc': '点击右上角「+」添加第一条提示词',
 
+  // 视图切换
+  'view.toCompact': '切换到紧凑列表',
+  'view.toComfortable': '切换到舒适视图',
+  'view.compactAria': '紧凑列表视图',
+  'view.comfortableAria': '舒适网格视图',
+
   // 卡片
   'card.aliasEdit': '别名 /{alias}，点击修改',
   'card.aliasSet': '设置别名',
@@ -176,6 +182,11 @@ const en: Record<DictKey, string> = {
   'empty.none': 'No prompts yet',
   'empty.noMatchDesc': 'Try a different keyword or category',
   'empty.noneDesc': 'Click "+" in the top right to add your first prompt',
+
+  'view.toCompact': 'Switch to compact list',
+  'view.toComfortable': 'Switch to comfortable view',
+  'view.compactAria': 'Compact list view',
+  'view.comfortableAria': 'Comfortable grid view',
 
   'card.aliasEdit': 'Alias /{alias}, click to edit',
   'card.aliasSet': 'Set alias',
