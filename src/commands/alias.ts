@@ -195,7 +195,8 @@ export function registerAliasCommands(ctx: Context): void {
         };
       }
       const lines = aliases.map(a => {
-        const prompt = getPromptById(a.promptId);
+        // 先按别名记录的工作目录解析，再回退到全局（用户级）解析，跨工作区也能显示正确标题
+        const prompt = getPromptById(a.promptId, a.promptCwd) ?? getPromptById(a.promptId);
         const title = prompt ? prompt.title : ht('cmd.alias.deletedPrompt');
         return ht('cmd.alias.line', { alias: a.alias, title });
       });

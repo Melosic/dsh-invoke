@@ -146,14 +146,24 @@ function tryParseStorageAt(filePath: string): PromptStorage | null {
 // 已知局限：缓存键为 mtimeMs。极低分辨率文件系统上（mtime 精确到秒），
 // 同秒内的两次外部写入可能因 mtime 相同而命中旧缓存；主流平台
 // （Linux/Windows/APFS）mtime 均为亚秒精度，实际风险可忽略。
-// 注意：缓存返回的是共享引用，调用方沿用「读 → 改 → 写回」模式即可保持一致，
-// 但不得在不写回的前提下就地修改缓存对象。
+// 注意：缓存对外只返回浅拷贝（顶层数组新对象），调用方可安全就地修改返回值而不影响缓存；
+// 写回经 writeStorageAt 覆盖缓存条目，保持内存与磁盘一致。
 
 interface CacheEntry {
   mtimeMs: number;
   data: PromptStorage;
 }
 const storageCache = new Map<string, CacheEntry>();
+
+/** 浅拷贝存储：复制对象与顶层三个数组，避免调用方就地修改污染共享缓存 */
+function shallowCopyStorage(data: PromptStorage): PromptStorage {
+  return {
+    ...data,
+    categories: data.categories.slice(),
+    customCategories: data.customCategories.slice(),
+    prompts: data.prompts.slice()
+  };
+}
 
 /** 读取文件 mtime；失败（不存在等）返回 null */
 function mtimeOf(filePath: string): number | null {
@@ -176,12 +186,12 @@ function readStorageAt(filePath: string): PromptStorage | null {
   }
   const cached = storageCache.get(filePath);
   if (cached && cached.mtimeMs === mtimeMs) {
-    return cached.data;
+    return shallowCopyStorage(cached.data);
   }
   const parsed = tryParseStorageAt(filePath);
   if (parsed) {
     storageCache.set(filePath, { mtimeMs, data: parsed });
-    return parsed;
+    return shallowCopyStorage(parsed);
   }
   console.warn(`[dsh-invoke] 存储文件损坏: ${filePath}，尝试 .bak 备份回退`);
   return tryParseStorageAt(`${filePath}.bak`); // 损坏回退属罕见路径，不入缓存

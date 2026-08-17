@@ -9,7 +9,6 @@ import {
   CopyIcon,
   ImportIcon,
   ExportIcon,
-  GistIcon,
   ChevronDownIcon,
   InboxIcon,
   MoonIcon,
@@ -599,6 +598,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                           className="pv-card-action-btn"
                           onClick={() => handleCopy(prompt)}
                           title={t('card.copy')}
+                          aria-label={t('card.copy')}
                         >
                           <CopyIcon size={13} />
                         </button>
@@ -606,6 +606,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                           className="pv-card-action-btn"
                           onClick={() => setAliasTarget(prompt)}
                           title={aliasEntry ? t('card.aliasEdit', { alias: aliasEntry.alias }) : t('card.aliasSet')}
+                          aria-label={aliasEntry ? t('card.aliasEdit', { alias: aliasEntry.alias }) : t('card.aliasSet')}
                         >
                           <LinkIcon size={13} />
                         </button>
@@ -613,6 +614,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                           className="pv-card-action-btn"
                           onClick={() => handleEdit(prompt)}
                           title={t('common.edit')}
+                          aria-label={t('common.edit')}
                         >
                           <EditIcon size={13} />
                         </button>
@@ -620,6 +622,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                           className="pv-card-action-btn danger"
                           onClick={() => handleDelete(prompt)}
                           title={t('card.deleteTitle')}
+                          aria-label={t('card.deleteTitle')}
                         >
                           <DeleteIcon size={13} />
                         </button>
@@ -642,6 +645,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                         className="pv-card-action-btn"
                         onClick={() => setAliasTarget(prompt)}
                         title={aliasEntry ? t('card.aliasEdit', { alias: aliasEntry.alias }) : t('card.aliasSet')}
+                        aria-label={aliasEntry ? t('card.aliasEdit', { alias: aliasEntry.alias }) : t('card.aliasSet')}
                       >
                         <LinkIcon size={13} />
                       </button>
@@ -649,6 +653,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                         className="pv-card-action-btn"
                         onClick={() => handleEdit(prompt)}
                         title={t('common.edit')}
+                        aria-label={t('common.edit')}
                       >
                         <EditIcon size={13} />
                       </button>
@@ -656,6 +661,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
                         className="pv-card-action-btn danger"
                         onClick={() => handleDelete(prompt)}
                         title={t('card.deleteTitle')}
+                        aria-label={t('card.deleteTitle')}
                       >
                         <DeleteIcon size={13} />
                       </button>
@@ -758,10 +764,6 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
           )}
         </div>
 
-        <button className="pv-toolbar-btn" disabled title={t('toolbar.gistTitle')}>
-          <GistIcon size={12} />
-          {t('toolbar.gist')}
-        </button>
         <span className="pv-spacer" />
         <span className="pv-statusbar">
           v{__DSH_INVOKE_VERSION__} · {t('statusbar.count', { count: prompts.length })}

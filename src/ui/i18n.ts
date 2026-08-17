@@ -59,10 +59,8 @@ const zh = {
   // 底部工具栏
   'toolbar.import': '导入',
   'toolbar.export': '导出',
-  'toolbar.exportJson': '导出 JSON',
-  'toolbar.exportYaml': '导出 YAML',
-  'toolbar.gist': 'Gist同步',
-  'toolbar.gistTitle': 'Gist 同步规划中，敬请期待',
+  'toolbar.exportJson': '导出为 JSON',
+  'toolbar.exportYaml': '导出为 YAML',
   'statusbar.count': '{count} 条提示词',
 
   // 加载错误
@@ -207,10 +205,8 @@ const en: Record<DictKey, string> = {
 
   'toolbar.import': 'Import',
   'toolbar.export': 'Export',
-  'toolbar.exportJson': 'Export JSON',
-  'toolbar.exportYaml': 'Export YAML',
-  'toolbar.gist': 'Gist Sync',
-  'toolbar.gistTitle': 'Gist sync is planned, stay tuned',
+  'toolbar.exportJson': 'Export as JSON',
+  'toolbar.exportYaml': 'Export as YAML',
   'statusbar.count': '{count} prompts',
 
   // Load error
