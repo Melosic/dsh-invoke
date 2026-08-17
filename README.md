@@ -281,7 +281,6 @@ npm run test           # run Jest unit tests
 | P2 | Project-level auto-load & two-layer merge | Done |
 | P2 | Usage stats & smart sorting | Done |
 | P2 | AI-assisted prompt generation (experimental) | Planned |
-| P2 | GitHub Gist cloud sync | Planned |
 
 ## FAQ
 
@@ -307,7 +306,7 @@ A: No. All operations can be done through the sidebar GUI; the command line is a
 
 ## Version Compatibility
 
-The v0.1.x series is compatible with DeepSeek Harness >=0.1.0 <0.2.0. When Harness ships a major update, we will adapt promptly — follow the GitHub Releases page.
+The v0.2.x series is compatible with DeepSeek Harness >=0.1.0 <0.2.0. When Harness ships a major update, we will adapt promptly — follow the GitHub Releases page.
 
 ## Contributing
 
