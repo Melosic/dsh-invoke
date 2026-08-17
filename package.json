@@ -1,6 +1,6 @@
 {
   "name": "dsh-invoke",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Prompt Vault & Invoker for DeepSeek Harness — 管理、分类、快速调用提示词，支持侧边栏 GUI",
   "type": "module",
   "main": "dist/index.js",
