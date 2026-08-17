@@ -154,7 +154,9 @@ async function isCwdAllowed(ctx: Context, raw: string | undefined | null): Promi
 }
 
 function serverError(res: ServerResponse, error: unknown): void {
-  json(res, 500, { error: error instanceof Error ? error.message : 'Internal Server Error' });
+  // 只记录不向下透传：避免向浏览器暴露文件路径 / 解析细节等内部信息
+  console.error('[dsh-invoke] 服务器内部错误:', error);
+  json(res, 500, { error: 'Internal Server Error' });
 }
 
 /** 请求体大小上限（导入文件等场景足够，防异常超大包占用内存） */

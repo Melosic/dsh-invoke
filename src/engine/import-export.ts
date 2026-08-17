@@ -9,6 +9,7 @@ import {
   getActiveLayerStorage,
   writeToActiveLayer
 } from '../storage/manager.js';
+import { getAllAliases, removeAlias } from '../storage/alias-store.js';
 
 // ============ 类型定义 ============
 
@@ -114,7 +115,22 @@ function importStorage(data: PromptStorage, mode: 'overwrite' | 'merge', cwd?: s
   const version = Math.max(current.version || 1, 1);
 
   if (mode === 'overwrite') {
+    // 覆盖前记录将被移除的提示词 ID，用于级联清理其别名（对齐 deletePrompt 语义）
+    const newIds = new Set(sanitized.map(p => p.id));
+    const removedIds = new Set(current.prompts.filter(p => !newIds.has(p.id)).map(p => p.id));
+
     writeToActiveLayer({ version, categories, customCategories, prompts: sanitized }, cwd);
+
+    // 级联删除悬空别名：overwrite 覆盖后这些提示词已不存在，别名指向它们即为悬空。
+    // （与 deletePrompt 的 removeAliasesByPromptId 保持一致，避免调用链报 "prompt missing"）
+    if (removedIds.size > 0) {
+      getAllAliases().forEach(alias => {
+        if (removedIds.has(alias.promptId)) {
+          removeAlias(alias.alias);
+        }
+      });
+    }
+
     const invalidNote = invalidCount > 0 ? `，过滤无效条目 ${invalidCount} 条` : '';
     return {
       success: true,

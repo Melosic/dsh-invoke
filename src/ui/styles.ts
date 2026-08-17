@@ -300,6 +300,20 @@ body[data-ds-dark-theme] .pv-scope,
   margin-bottom: 12px;
   flex-shrink: 0;
 }
+
+/* 加载错误横幅 */
+.pv-error-banner {
+  flex-shrink: 0;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--red-50);
+  border: 1px solid var(--red-600);
+  color: var(--red-600);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 .pv-search-wrap { position: relative; flex: 1; }
 .pv-search-icon {
   position: absolute;

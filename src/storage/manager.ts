@@ -101,10 +101,39 @@ function normalizeStorage(data: Partial<PromptStorage>): PromptStorage {
   return result;
 }
 
+// ============ 版本迁移 ============
+
+/**
+ * 当前 schema 版本。修改存储结构时递增，并在 MIGRATIONS 中登记对应迁移。
+ * 读取侧对旧版本数据先迁移再规范化，保证写入的数据始终完整。
+ */
+export const SCHEMA_VERSION = 1;
+
+/** 迁移：将存储从 (fromVersion) 升级到 (fromVersion + 1) 的幂等变换 */
+type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
+
+/** 版本迁移注册表：键为"目标版本"，值为"从上一版升级到该版本的迁移"。当前无历史变更，为空。 */
+const MIGRATIONS: Record<number, Migration> = {};
+
+/**
+ * 将任意版本的数据迁移到当前 SCHEMA_VERSION。
+ * 逐级执行 MIGRATIONS 中登记的迁移；无迁移可用的层级仅推进版本号。
+ */
+export function migrateStorage(data: Record<string, unknown>): Record<string, unknown> {
+  let version = typeof data.version === 'number' ? data.version : 1;
+  while (version < SCHEMA_VERSION) {
+    const next = version + 1;
+    const migrate = MIGRATIONS[next];
+    data = migrate ? migrate(data) : data;
+    version = next;
+  }
+  return { ...data, version: SCHEMA_VERSION };
+}
+
 /** 尝试解析存储文件；损坏/不存在返回 null */
 function tryParseStorageAt(filePath: string): PromptStorage | null {
   try {
-    return normalizeStorage(JSON.parse(fs.readFileSync(filePath, 'utf-8')));
+    return normalizeStorage(migrateStorage(JSON.parse(fs.readFileSync(filePath, 'utf-8'))));
   } catch {
     return null;
   }

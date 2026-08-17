@@ -65,6 +65,9 @@ const zh = {
   'toolbar.gistTitle': 'Gist 同步规划中，敬请期待',
   'statusbar.count': '{count} 条提示词',
 
+  // 加载错误
+  'status.loadError': '数据加载失败：{message}',
+
   // 变量填充弹窗
   'varDialog.desc': '请填充以下变量后复制',
   'varDialog.copy': '复制到剪贴板',
@@ -209,6 +212,9 @@ const en: Record<DictKey, string> = {
   'toolbar.gist': 'Gist Sync',
   'toolbar.gistTitle': 'Gist sync is planned, stay tuned',
   'statusbar.count': '{count} prompts',
+
+  // Load error
+  'status.loadError': 'Failed to load data: {message}',
 
   'varDialog.desc': 'Fill in the variables below, then copy',
   'varDialog.copy': 'Copy to clipboard',

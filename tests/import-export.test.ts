@@ -6,8 +6,9 @@ import {
   importFromJSON,
   importFromYAML
 } from '../src/engine/import-export';
-import { readStorage, writeStorage, getAllCategories } from '../src/storage/manager';
+import { readStorage, writeStorage, getAllCategories, SCHEMA_VERSION, migrateStorage } from '../src/storage/manager';
 import type { Prompt, PromptStorage, Variable } from '../src/storage/manager';
+import { addAlias, getAllAliases } from '../src/storage/alias-store';
 import { mockFs } from './helpers/mockFs';
 
 jest.mock('@deepseek-ai/dsh-home-paths', () => ({
@@ -171,6 +172,48 @@ describe('importFromJSON', () => {
     };
     importFromJSON(JSON.stringify(imported), 'merge');
     expect(getAllCategories()).toContain('项目分类');
+  });
+});
+
+describe('overwrite 导入的悬空别名清理', () => {
+  beforeEach(() => mockFs.__reset());
+
+  test('指向被覆盖删除提示词的别名被级联清理', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'a' }), makePrompt({ id: 'keep' })]));
+    addAlias('removed', 'a');
+    addAlias('kept', 'keep');
+
+    const imported = makeStorage([makePrompt({ id: 'keep' })]);
+    const result = importFromJSON(JSON.stringify(imported), 'overwrite');
+    expect(result.success).toBe(true);
+
+    // 指向被移除提示词 a 的别名已清理；指向保留提示词 keep 的别名仍在
+    expect(getAllAliases().map(a => a.alias).sort()).toEqual(['kept']);
+  });
+
+  test('overwrite 后保留的提示词别名不受影响', () => {
+    writeStorage(makeStorage([makePrompt({ id: 'keep' })]));
+    addAlias('myalias', 'keep');
+    const imported = makeStorage([makePrompt({ id: 'keep' }), makePrompt({ id: 'b' })]);
+    const result = importFromJSON(JSON.stringify(imported), 'overwrite');
+    expect(result.success).toBe(true);
+    expect(getAllAliases().map(a => a.alias).sort()).toEqual(['myalias']);
+  });
+});
+
+describe('schema 版本迁移', () => {
+  test('migrateStorage 将旧版本数据推进到 SCHEMA_VERSION 且保留字段', () => {
+    const migrated = migrateStorage({ version: 0, prompts: [{ id: 'x' }], title: 'keep' });
+    expect(migrated.version).toBe(SCHEMA_VERSION);
+    // 复用原始对象字段，不丢数据
+    expect((migrated.prompts as unknown[]).length).toBe(1);
+    expect((migrated as Record<string, unknown>).title).toBe('keep');
+  });
+
+  test('migrateStorage 对缺失 version 缺省为 1（不误升级）', () => {
+    const migrated = migrateStorage({ prompts: [] });
+    expect(migrated.version).toBe(SCHEMA_VERSION);
+    expect((migrated.prompts as unknown[]).length).toBe(0);
   });
 });
 

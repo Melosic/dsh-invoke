@@ -57,6 +57,9 @@ const VIEW_STORAGE_KEY = 'dsh-invoke:view-mode';
 /** 悬停速览延迟（ms）：对齐 Voyager 提示词库的 250ms 交互 */
 const HOVER_PREVIEW_DELAY_MS = 250;
 
+/** 搜索防抖延迟（ms）：大库下避免每次击键全量过滤触发昂贵重渲染 */
+const SEARCH_DEBOUNCE_MS = 250;
+
 /** 速览浮窗宽度（与 styles.ts 的 .pv-preview width 保持一致，用于视口内钳位） */
 const PREVIEW_WIDTH = 360;
 /** 速览浮窗预估最大高度（标题 + 描述 + 300px 正文 + 内边距） */
@@ -103,9 +106,13 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  // 防抖后的搜索词：列表过滤基于它，输入框即时显示原始值
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null);
+  // 数据加载错误态：失败时展示横幅，避免静默失败
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // 导出下拉菜单状态
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
@@ -173,19 +180,31 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
   // ============ 加载数据 ============
 
   const loadData = async () => {
-    const [sorted, cats, aliasList] = await Promise.all([
-      getSortedPrompts('smart'),
-      getAllCategories(),
-      getAllAliases()
-    ]);
-    setPrompts(sorted);
-    setCategories(cats);
-    setAliases(aliasList);
+    try {
+      const [sorted, cats, aliasList] = await Promise.all([
+        getSortedPrompts('smart'),
+        getAllCategories(),
+        getAllAliases()
+      ]);
+      setPrompts(sorted);
+      setCategories(cats);
+      setAliases(aliasList);
+      setLoadError(null);
+    } catch (err) {
+      // 展示错误横幅（面板为本地插件，加载失败场景少见，但不应静默）
+      setLoadError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // 搜索防抖：输入停止 SEARCH_DEBOUNCE_MS 后才更新过滤依据
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedQuery(searchQuery), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [searchQuery]);
 
   const handleCategoryChange = () => {
     loadData();
@@ -198,8 +217,8 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
     if (selectedCategory) {
       result = result.filter(p => p.category === selectedCategory);
     }
-    if (searchQuery.trim()) {
-      const query = searchQuery.trim().toLowerCase();
+    if (debouncedQuery.trim()) {
+      const query = debouncedQuery.trim().toLowerCase();
       result = result.filter(p =>
         p.title.toLowerCase().includes(query) ||
         p.description.toLowerCase().includes(query) ||
@@ -208,7 +227,7 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
       );
     }
     return result;
-  }, [prompts, selectedCategory, searchQuery]);
+  }, [prompts, selectedCategory, debouncedQuery]);
 
   // promptId → 别名 映射（一个提示词最多一个别名）
   const aliasByPromptId = useMemo(() => {
@@ -487,6 +506,11 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
 
         {/* 内容区 */}
         <div className="pv-content">
+          {loadError && (
+            <div className="pv-error-banner" role="alert">
+              {t('status.loadError', { message: loadError })}
+            </div>
+          )}
           {/* 搜索框 */}
           <div className="pv-searchbar">
             <div className="pv-search-wrap">
