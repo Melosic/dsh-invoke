@@ -18,6 +18,9 @@ export const name = 'dsh-invoke-client';
 export const version = '0.1.0';
 export const description = 'Prompt Vault 侧边栏面板';
 
+/** 声明注入的服务：侧边栏 slot 与 i18n locale（cordis 会在服务就绪后才加载本插件） */
+export const inject = ['slots', 'locale'];
+
 /** 侧边栏按钮的 ID 与挂载点 ID */
 // 挂载点 id 必须为 dsh-invoke-root：styles.ts 的 design token、暗色主题选择器、
 // theme.ts 的主题检测、WebviewPanel 的主题切换均以 #dsh-invoke-root 为根。

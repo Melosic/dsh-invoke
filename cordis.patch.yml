@@ -3,6 +3,4 @@
 # 遵循 cordis-plugin-include 的 patch 语义：`insert`（无 id）将行追加到顶层。
 - insert:
     - id: dsh-invoke
-      name: dsh-invoke
-      config:
-        enabled: true
+      name: '@dsh-external/dsh-invoke'

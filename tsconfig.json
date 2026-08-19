@@ -5,7 +5,7 @@
     "lib": ["ES2020"],
     "jsx": "react-jsx",
     "declaration": true,
-    "outDir": "./dist",
+    "outDir": "./lib",
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
@@ -15,5 +15,5 @@
     "moduleResolution": "bundler"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tests", "src/client", "src/ui"]
+  "exclude": ["node_modules", "lib", "tests", "src/client", "src/ui"]
 }

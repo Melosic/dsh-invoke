@@ -24,9 +24,16 @@ export function registerPromptCommands(ctx: Context): void {
     return;
   }
 
-  // /prompt - 列出所有提示词
-  ctx.commands.register({
-    name: 'prompt',
+  ctx.effect(() => {
+    const disposers: Array<() => void> = [];
+    const reg = (spec: Parameters<typeof ctx.commands.register>[0]): void => {
+      const dispose = ctx.commands.register(spec);
+      if (typeof dispose === 'function') disposers.push(dispose as () => void);
+    };
+
+    // /prompt - 列出所有提示词
+    reg({
+      name: 'prompt',
     description: ht('cmd.prompt.desc'),
     handler: (invocation) => {
       const prompts = getSortedPrompts('smart', cwdOf(invocation));
@@ -45,7 +52,7 @@ export function registerPromptCommands(ctx: Context): void {
   });
 
   // /prompt-list - 按分类列出
-  ctx.commands.register({
+  reg({
     name: 'prompt-list',
     description: ht('cmd.promptList.desc'),
     handler: (invocation) => {
@@ -61,6 +68,11 @@ export function registerPromptCommands(ctx: Context): void {
       return { kind: 'success' as const, text: `${ht('cmd.promptList.header')}\n\n${lines.join('\n\n')}` };
     },
   });
+
+    return () => {
+      for (const dispose of disposers.reverse()) dispose();
+    };
+  }, 'dsh-invoke.prompt-commands');
 
   debugLog('prompt commands registered');
 }

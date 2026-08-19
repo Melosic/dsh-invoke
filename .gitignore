@@ -6,7 +6,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Build output
-dist/
+lib/
 build/
 *.tsbuildinfo
 
@@ -33,3 +33,15 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Local npm cache (e.g. `npm install --cache .npm-cache`)
+.npm-cache/
+
+# Logs (build / install / typecheck output)
+*.log
+
+# npm pack / release tarballs produced by `npm pack` or the build pipeline
+*.tgz
+
+# Misc tool caches (jest --cache, etc.)
+.cache/

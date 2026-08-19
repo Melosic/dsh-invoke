@@ -25,14 +25,14 @@ await build({
   format: 'cjs',
   platform: 'browser',
   target: 'es2020',
-  outfile: 'dist/client/index.js',
+  outfile: 'lib/client/index.js',
   external: PLATFORM_MODULES,
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
     __DSH_INVOKE_VERSION__: JSON.stringify(pkg.version),
   },
   banner: {
-    js: 'window.__ModuleLoader__.load({ id: "dsh-invoke", factory: (require) => {\nvar module = { exports: {} }; var exports = module.exports;',
+    js: `window.__ModuleLoader__.load({ id: ${JSON.stringify(pkg.name)}, factory: (require) => {\nvar module = { exports: {} }; var exports = module.exports;`,
   },
   footer: {
     js: '\nreturn module.exports; } });',

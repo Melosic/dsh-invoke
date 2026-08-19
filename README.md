@@ -37,7 +37,7 @@ The plugin mounts as a Cordis plugin. Give `cordis.patch.yml` to Harness's Cordi
 ```yaml
 - insert:
     - id: dsh-invoke
-      name: dsh-invoke
+      name: '@dsh-external/dsh-invoke'
       config:
         enabled: true
 ```
@@ -45,9 +45,9 @@ The plugin mounts as a Cordis plugin. Give `cordis.patch.yml` to Harness's Cordi
 Install dependencies:
 
 ```bash
-npm install dsh-invoke
+npm install @dsh-external/dsh-invoke
 # or
-pnpm add dsh-invoke
+pnpm add @dsh-external/dsh-invoke
 ```
 
 ## Local Development / From Source
@@ -78,10 +78,10 @@ If you want to develop the plugin locally or run it without publishing to npm:
    ```
 
 5. **Link the plugin into the profile**:
-   Edit `~/.dsh/profiles/web/package.json` and add `dsh-invoke` to dependencies:
+   Edit `~/.dsh/profiles/web/package.json` and add `@dsh-external/dsh-invoke` to dependencies:
    ```json
    "dependencies": {
-     "dsh-invoke": "link:/absolute/path/to/dsh-invoke"
+     "@dsh-external/dsh-invoke": "link:/absolute/path/to/dsh-invoke"
    }
    ```
    Then install the profile dependencies:

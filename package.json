@@ -1,19 +1,20 @@
 {
-  "name": "dsh-invoke",
+  "name": "@dsh-external/dsh-invoke",
   "version": "0.2.0",
   "description": "Prompt Vault & Invoker for DeepSeek Harness — 管理、分类、快速调用提示词，支持侧边栏 GUI",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
     },
     "./client": {
-      "types": "./dist/client/client/index.d.ts",
-      "default": "./dist/client/index.js"
+      "types": "./lib/client/index.d.ts",
+      "default": "./lib/client/index.js"
     },
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -32,6 +33,9 @@
   "author": "Melosic",
   "license": "MIT",
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
@@ -41,7 +45,7 @@
       "immediately": true
     }
   },
-  "dependencies": {
+  "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.6",

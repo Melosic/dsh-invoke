@@ -1,6 +1,6 @@
 // src/engine/template.ts
 
-import { Variable } from '../storage/manager.js';
+import type { Variable } from '../storage/manager.js';
 
 /** 转义正则特殊字符（变量名含 . * 等时避免误匹配） */
 function escapeRegex(s: string): string {
