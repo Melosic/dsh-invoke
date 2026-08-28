@@ -25,7 +25,7 @@ await build({
   format: 'cjs',
   platform: 'browser',
   target: 'es2020',
-  outfile: 'lib/client/index.js',
+  outfile: 'lib/client.js',
   external: PLATFORM_MODULES,
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),

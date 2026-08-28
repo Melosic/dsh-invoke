@@ -12,7 +12,7 @@
     },
     "./client": {
       "types": "./lib/client/index.d.ts",
-      "default": "./lib/client/index.js"
+      "default": "./lib/client.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
