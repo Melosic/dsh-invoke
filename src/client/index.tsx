@@ -11,6 +11,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { WebviewPanel } from '../ui/WebviewPanel.js';
 import { injectStyles } from '../ui/styles.js';
 import { setupI18n } from '../ui/i18n.js';
+import { loadPanelMode } from '../ui/panel-mode.js';
 import { initApiClient } from './api.js';
 import { debugLog } from '../shared/log.js';
 
@@ -63,65 +64,42 @@ function findSettingsButton(): HTMLElement | null {
 
 /**
  * slot 化入口：注册到官方侧边栏的 sidebar.footer.action（kind: list）。
- * 返回 true 表示已进入等待/注册流程（无论 slot 是否已声明）；
- * 返回 false 表示宿主无 slots 服务（旧版 Harness），调用方走 DOM 兜底。
- *
- * 注意：slot 未声明时 register 会同步 throw，所以用 slots.inject() 等待
- * 声明提交后再注册（官方跨插件加载顺序机制）；全程 try/catch，
- * 任何失败都静默降级到 DOM 注入方案。
+ * 返回 true 表示注册成功（官方入口接管）；
+ * 返回 false 表示宿主无 slots 服务或 slot 未声明（register 同步 throw），
+ * 调用方据此走 DOM 注入兜底。
  */
 function tryRegisterSlotEntry(ctx: Context): boolean {
-  // cordis 懒代理下未 inject 声明的服务属性访问即抛错，需 try/catch 后走 DOM 兜底
+  // 直接注册到官方 sidebar.footer.action slot（该 slot 由宿主声明，无需 inject 声明）。
+  // 注册失败（如 slot 未声明）则静默降级到 DOM 注入兜底。
   let slots: SlotsService | undefined;
   try {
     slots = (ctx as { slots?: SlotsService }).slots;
   } catch {
     return false;
   }
-  if (!slots || typeof slots.inject !== 'function' || typeof slots.register !== 'function') {
+  if (!slots || typeof slots.register !== 'function') {
     return false;
   }
   try {
-    let disposeEntry: (() => void) | null = null;
-    const stopInject = slots.inject('sidebar.footer.action', () => {
-      try {
-        const dispose = slots.register(
-          { name: 'sidebar.footer.action', id: 'dsh-invoke', order: 10, label: 'Prompt Vault' },
-          SidebarEntryButton
-        );
-        if (typeof dispose === 'function') disposeEntry = dispose as () => void;
-        // slot 入口接管后，DOM 兜底按钮退场（observer 由 disposer 断开）
-        document.getElementById(SIDEBAR_BTN_ID)?.remove();
-        stopDomFallback();
-        debugLog('registered into official sidebar.footer.action slot');
-      } catch (e) {
-        console.warn(`${C_LOG_PREFIX} slot 注册失败，保持 DOM 注入兜底`, e);
-      }
-    });
-    // 卸载/热重载时注销 slot 入口与 inject 等待，避免按钮残留与回调悬挂
+    const dispose = slots.register({ name: 'sidebar.footer.action', id: 'dsh-invoke', priority: 10, label: 'Prompt Vault' }, SidebarEntryButton);
     ctx.effect(() => () => {
       try {
-        if (typeof stopInject === 'function') stopInject();
-      } catch {
-        /* 忽略清理失败 */
-      }
-      try {
-        disposeEntry?.();
+        if (typeof dispose === 'function') (dispose as () => void)();
       } catch {
         /* 忽略清理失败 */
       }
     }, 'dsh-invoke.slot-entry');
+    debugLog('registered into official sidebar.footer.action slot');
     return true;
   } catch (e) {
-    console.warn(`${C_LOG_PREFIX} slots.inject 不可用，走 DOM 注入兜底`, e);
+    console.warn(`${C_LOG_PREFIX} slots.register 失败，走 DOM 注入兜底`, e);
     return false;
   }
 }
 
 /** slots 服务的最小运行时接口（类型层 SlotMap 未合并进编译图，按结构探测） */
 interface SlotsService {
-  inject(key: string, callback: () => void): unknown;
-  register<P>(options: { name: string; id: string; order?: number; label?: string }, component: React.ComponentType<P>): unknown;
+  register<P>(options: { name: string; id: string; priority?: number; label?: string }, component: React.ComponentType<P>): unknown;
 }
 
 /** slot 入口按钮的 props（官方 sidebar 渲染时注入 wide） */
@@ -231,10 +209,43 @@ function injectSidebarButton(ctx: Context): () => void {
   return dispose;
 }
 
-/** 隐藏面板（保留 DOM 与 React 状态，便于再次打开） */
+/** 面板开合动画时长（ms，与 styles.ts 的 transition 保持一致） */
+const PANEL_ANIM_MS = 220;
+
+/** 面板当前是否处于打开态（data-pv-open 驱动进入/收起动画） */
+function isPanelOpen(): boolean {
+  return (
+    document.getElementById(PANEL_ROOT_ID)?.getAttribute('data-pv-open') === 'true'
+  );
+}
+
+/** 标记面板开合状态（CSS 据此播放进入/收起动画） */
+function setPanelOpen(open: boolean): void {
+  document.getElementById(PANEL_ROOT_ID)?.setAttribute(
+    'data-pv-open',
+    open ? 'true' : 'false'
+  );
+}
+
+/** 隐藏面板：先播放收起动画，动画结束后再隐藏（保留 DOM 与 React 状态） */
 function hidePanel() {
   const root = document.getElementById(PANEL_ROOT_ID);
-  if (root) root.style.display = 'none';
+  if (!root) return;
+  setPanelOpen(false);
+  window.setTimeout(() => {
+    // 快速开关保护：动画期间若又被打开则不隐藏
+    if (root.getAttribute('data-pv-open') === 'true') return;
+    root.style.display = 'none';
+  }, PANEL_ANIM_MS);
+}
+
+/** 显示面板：先恢复容器再标记 open，让进入动画可播（先强制 reflow） */
+function showPanel() {
+  const root = document.getElementById(PANEL_ROOT_ID);
+  if (!root) return;
+  root.style.display = 'flex';
+  void root.offsetWidth;
+  setPanelOpen(true);
 }
 
 /** 切换面板显示/隐藏 */
@@ -242,10 +253,13 @@ function togglePanel() {
   const root = document.getElementById(PANEL_ROOT_ID);
   if (!root) {
     mountPanel();
-  } else if (root.style.display === 'none') {
-    root.style.display = 'flex';
-  } else {
+    showPanel();
+    return;
+  }
+  if (isPanelOpen()) {
     hidePanel();
+  } else {
+    showPanel();
   }
 }
 
@@ -256,6 +270,8 @@ function mountPanel() {
   const container = document.createElement('div');
   container.id = PANEL_ROOT_ID;
   container.className = 'dsh-invoke-root';
+  container.setAttribute('data-pv-panel', loadPanelMode());
+  container.setAttribute('data-pv-open', 'false');
   document.body.appendChild(container);
 
   const root = createRoot(container);
@@ -278,13 +294,14 @@ export function apply(ctx: Context) {
   // 加载时即注入全局样式（幂等），确保侧边栏入口按钮立即可见且有样式
   injectStyles();
 
-  // 入口策略：优先官方 sidebar.footer.action slot；DOM 注入兜底并行运行，
-  // slot 注册成功后自动退场（stopDomFallback）。覆盖三种情形：
+  // 入口策略：优先官方 sidebar.footer.action slot；slot 注册失败才 DOM 注入兜底。
   //   1. 无 slots 服务（旧版宿主）→ 仅 DOM 兜底
-  //   2. slot 已声明/稍后声明 → slot 接管，DOM 兜底退场
-  //   3. slots 服务存在但 slot 永不声明 → DOM 兜底持续工作
-  tryRegisterSlotEntry(ctx);
-  ctx.effect(() => injectSidebarButton(ctx), 'dsh-invoke.sidebar');
+  //   2. slot 已声明 → slot 接管（官方入口，无重复按钮）
+  //   3. slots 服务存在但 slot 未声明 → DOM 兜底持续工作
+  const slotOk = tryRegisterSlotEntry(ctx);
+  if (!slotOk) {
+    ctx.effect(() => injectSidebarButton(ctx), 'dsh-invoke.sidebar');
+  }
 
   debugLog('sidebar panel loaded');
 }

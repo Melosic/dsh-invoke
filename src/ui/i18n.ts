@@ -23,6 +23,8 @@ const zh = {
   'header.closeAria': '关闭面板',
   'header.themeToLight': '切换到亮色模式',
   'header.themeToDark': '切换到暗色模式',
+  'header.toDrawer': '切换为右侧抽屉',
+  'header.toDialog': '切换为居中弹窗',
 
   // 搜索
   'search.placeholder': '搜索标题、描述、标签...',
@@ -175,6 +177,8 @@ const en: Record<DictKey, string> = {
   'header.closeAria': 'Close panel',
   'header.themeToLight': 'Switch to light mode',
   'header.themeToDark': 'Switch to dark mode',
+  'header.toDrawer': 'Switch to side drawer',
+  'header.toDialog': 'Switch to centered dialog',
 
   'search.placeholder': 'Search title, description, tags...',
   'search.stats': '{count} items',

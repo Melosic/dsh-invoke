@@ -17,9 +17,12 @@ import {
   LinkIcon,
   ListIcon,
   GridIcon,
-  XIcon
+  XIcon,
+  DrawerIcon,
+  DialogIcon
 } from './icons.js';
 import { useTheme, ThemeMode } from './theme.js';
+import { usePanelMode, setPanelMode } from './panel-mode.js';
 import { injectStyles } from './styles.js';
 import { useT, t } from './i18n.js';
 import { PromptFormModal } from './components/PromptFormModal.js';
@@ -102,6 +105,7 @@ export interface WebviewPanelProps {
 export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: getSelectedTextProp, onClose }) => {
   useT(); // 语言切换时整棵面板树重渲染
   const theme = useTheme(); // 主题：跟随系统 + 手动覆盖
+  const panelMode = usePanelMode(); // 面板形态：右侧抽屉 / 居中弹窗（localStorage 持久化）
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -382,6 +386,12 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
     root.setAttribute('data-pv-theme', next);
   };
 
+  // ============ 面板形态切换（抽屉 ↔ 弹窗，即时生效） ============
+
+  const togglePanelMode = () => {
+    setPanelMode(panelMode === 'drawer' ? 'dialog' : 'drawer');
+  };
+
   // ============ 搜索高亮 ============
 
   // 将 query 命中的片段包装为 <mark>，未命中时原样返回文本
@@ -466,7 +476,10 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
   // ============ 渲染 ============
 
   return (
-    <div className="pv-container">
+    <>
+      {/* 面板背板遮罩：点击关闭（抽屉左侧 / 弹窗背景区） */}
+      <div className="pv-panel-mask" onClick={closePanel} aria-hidden="true" />
+      <div className="pv-container">
       {/* 顶栏 */}
       <div className="pv-header">
         <span className="pv-title">
@@ -474,6 +487,15 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
           Prompt Vault
         </span>
         <div className="pv-header-actions">
+          <button
+            className="pv-icon-btn"
+            onClick={togglePanelMode}
+            title={panelMode === 'drawer' ? t('header.toDialog') : t('header.toDrawer')}
+            aria-label={panelMode === 'drawer' ? t('header.toDialog') : t('header.toDrawer')}
+            aria-pressed={panelMode === 'drawer'}
+          >
+            {panelMode === 'drawer' ? <DialogIcon size={16} /> : <DrawerIcon size={16} />}
+          </button>
           <button
             className="pv-icon-btn"
             onClick={handleToggleTheme}
@@ -841,7 +863,8 @@ export const WebviewPanel: React.FC<WebviewPanelProps> = ({ getSelectedText: get
         onClose={() => setAliasTarget(null)}
         onChanged={loadData}
       />
-    </div>
+      </div>
+    </>
   );
 };
 

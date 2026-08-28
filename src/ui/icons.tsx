@@ -188,3 +188,19 @@ export const XIcon: React.FC<IconProps> = ({ size, className }) => (
     <path d="M3.34 2.26a.9.9 0 0 0-1.08 1.4L6.74 8.3l-4.48 4.44a.9.9 0 1 0 1.26 1.28L8 9.58l4.48 4.44a.9.9 0 1 0 1.26-1.28L9.26 8.3l4.48-4.44a.9.9 0 1 0-1.26-1.28L8 7.02 3.34 2.26z" />
   </FillBase>
 );
+
+/** 面板形态图标：右侧抽屉（当前为弹窗、目标切回抽屉时显示） */
+export const DrawerIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="3" y="3" width="13" height="18" rx="1.5" />
+    <line x1="9" y1="3" x2="9" y2="21" />
+  </IconBase>
+);
+
+/** 面板形态图标：居中弹窗（当前为抽屉、目标切到弹窗时显示） */
+export const DialogIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="2.5" y="4" width="19" height="13" rx="2" />
+    <line x1="2.5" y1="9" x2="21.5" y2="9" />
+  </IconBase>
+);

@@ -18,14 +18,27 @@ export function injectStyles(): void {
   style.textContent = `
 /* ============ 设计 Token（亮色）============ */
 /* 对齐 @deepseek-ai/dsh-client-ui-theme 的 design-platform.css */
-/* 根锚点容器：作为 body 上的覆盖层挂载，flex 纵向撑满 */
+/* 根锚点容器：作为 body 上的覆盖层挂载，仅承载遮罩 + 面板（形态由 data-pv-panel 控制） */
 #dsh-invoke-root {
   position: fixed;
   inset: 0;
   z-index: 9990;
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
+}
+
+/* 面板背板遮罩：点击关闭；透明度由 data-pv-open 驱动 */
+.pv-panel-mask {
+  position: absolute;
+  inset: 0;
+  background: var(--pv-bg-mask);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity 220ms ease;
+  cursor: default;
+}
+#dsh-invoke-root[data-pv-open='true'] .pv-panel-mask {
+  opacity: 1;
 }
 
 /* Token 作用域：面板根节点 + Portal 到 body 的浮层。
@@ -155,11 +168,14 @@ body[data-ds-dark-theme] .pv-scope,
 }
 
 /* ============ 布局 ============ */
+/* 面板本体：两种形态由 #dsh-invoke-root[data-pv-panel] 区分（drawer 右侧抽出 / dialog 居中弹窗）。
+   默认态（未打开）位移/透明隐藏在容器外，由 client 层在 data-pv-open 时切换。 */
 .pv-container {
+  position: fixed;
+  z-index: 2;
   display: flex;
   flex-direction: column;
-  flex: 1;
-  height: 100%;
+  min-width: 0;
   min-height: 0;
   padding: 12px 14px;
   font-family: var(--pv-font);
@@ -167,6 +183,63 @@ body[data-ds-dark-theme] .pv-scope,
   background: var(--pv-bg-base);
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
+  border: 1px solid var(--pv-border-1);
+  box-shadow: var(--pv-shadow-modal);
+  transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 220ms ease;
+}
+
+/* 右侧抽屉 */
+#dsh-invoke-root[data-pv-panel='drawer'] .pv-container {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 100vw);
+  border-radius: 0;
+  border-width: 1px 0 0 1px;
+  transform: translateX(104%);
+  visibility: hidden;
+  transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 220ms;
+}
+#dsh-invoke-root[data-pv-panel='drawer'][data-pv-open='true'] .pv-container {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* 居中弹窗 */
+#dsh-invoke-root[data-pv-panel='dialog'] .pv-container {
+  top: 50%;
+  left: 50%;
+  width: min(720px, calc(100vw - 32px));
+  height: min(86vh, 960px);
+  max-height: min(88vh, 960px);
+  border-radius: var(--pv-radius-lg);
+  overflow: hidden;
+  transform: translate(-50%, -50%) scale(0.96);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 220ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 220ms ease,
+    visibility 0s linear 220ms;
+}
+#dsh-invoke-root[data-pv-panel='dialog'][data-pv-open='true'] .pv-container {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    transform 220ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 220ms ease;
+}
+
+/* 无动画偏好：即时显示/隐藏 */
+@media (prefers-reduced-motion: reduce) {
+  .pv-panel-mask,
+  #dsh-invoke-root .pv-container {
+    transition: none !important;
+  }
 }
 
 /* 顶栏 */
