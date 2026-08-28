@@ -13,6 +13,7 @@ dsh-invoke 是 DeepSeek Harness 的社区插件，专注于提示词的管理与
 ## 特性
 
 - **侧边栏 GUI 优先**：新增 / 编辑 / 删除 / 查看 / 搜索 / 分类管理，全部可视化完成
+- **灵活的弹出形态**：默认以右侧抽屉打开（聊天区保持可见，复制后可直接粘贴），可一键切换为居中弹窗；点击遮罩或按 `Esc` 关闭，形态偏好按浏览器记忆
 - **快速调用（复制到剪贴板）**：点击「复制」→ 填充变量 → 复制 → 手动粘贴发送，不依赖 Harness 内部 DOM，100% 兼容
 - **变量替换**：支持 Mustache 风格占位符 `{{var}}`，调用时弹出对话框交互式填充。（编辑器选区自动提取为规划中功能：提取引擎已就绪，等待宿主开放选区 API）
 - **分类树 + 实时搜索**：左侧分类筛选，顶部搜索框实时过滤（标题 / 描述 / 标签 / 正文），命中关键词高亮
@@ -42,13 +43,15 @@ dsh-invoke 是 DeepSeek Harness 的社区插件，专注于提示词的管理与
         enabled: true
 ```
 
-安装依赖：
+安装本插件：
 
-```bash
-npm install dsh-invoke
-# 或
-pnpm add dsh-invoke
+> 本插件暂未发布到 npm / pnpm registry。最简单的方式是在 DeepSeek Harness 的**创造模式**（cordis preset）中直接让 AI 安装，附上仓库链接即可：
+
+```text
+帮我安装这个插件 https://github.com/Melosic/dsh-invoke
 ```
+
+dsh 会从 GitHub 拉取本插件并自动完成挂载。若要手动挂载已安装的插件，按上方 patch 配置添加即可。
 
 ## 本地开发 / 从源码安装
 

@@ -13,6 +13,7 @@ The plugin runs as a **Host + Client two-part plugin**: the Host side (Node) reg
 ## Features
 
 - **Sidebar GUI first**: add / edit / delete / view / search / category management, all visual.
+- **Flexible panel modes**: opens as a side drawer by default so the chat stays visible — paste right after copying; switch to a centered dialog anytime. Close via mask click or `Esc`, and the mode is remembered per browser.
 - **Quick invoke (copy to clipboard)**: click "Copy" → fill variables → copy → paste and send. Independent of Harness's internal DOM, 100% compatible.
 - **Variable substitution**: Mustache-style `{{var}}` placeholders, filled interactively via a dialog on invoke. (Auto-extraction from the editor selection is planned — the extraction engine is ready, waiting for a selection API from the host.)
 - **Category tree + live search**: left-hand category filter, top search box with real-time filtering (title / description / tags / body), with matched-keyword highlighting.
@@ -42,13 +43,18 @@ The plugin mounts as a Cordis plugin. Give `cordis.patch.yml` to Harness's Cordi
         enabled: true
 ```
 
-Install dependencies:
+Install the plugin:
 
-```bash
-npm install @dsh-external/dsh-invoke
-# or
-pnpm add @dsh-external/dsh-invoke
+> The plugin is not published to npm or pnpm yet. The recommended way is to
+> ask the AI inside DeepSeek Harness **Creator mode** (the cordis preset),
+> pasting the repository link:
+
+```text
+Install this plugin https://github.com/Melosic/dsh-invoke
 ```
+
+dsh pulls the plugin from GitHub and mounts it automatically. To mount an
+already-installed plugin manually, add the patch entry above.
 
 ## Local Development / From Source
 
