@@ -93,7 +93,7 @@ function main() {
     '--external:react-dom/client',
     '--external:@deepseek-ai/cordis',
     '--define:process.env.NODE_ENV="production"',
-    '--define:__DSH_INVOKE_VERSION__="0.2.0"',
+    '--define:__DSH_INVOKE_VERSION__="0.2.1"',
     "--banner:js=window.__ModuleLoader__.load({ id: '@dsh-external/dsh-invoke', factory: (require) => { var module = { exports: {} }; var exports = module.exports;",
     "--footer:js=\nreturn module.exports; } });",
   ];

@@ -3,6 +3,15 @@
 本项目的所有重要变更都会记录在此文件中，格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.2.1] - 2026-08-28
+
+### 新增
+- 侧边栏面板支持右侧抽屉 / 居中弹窗两种形态（默认抽屉，聊天区保持可见），点击遮罩或按 `Esc` 关闭，形态偏好按浏览器记忆
+
+### 变更
+- 侧边栏入口改为直连官方 `sidebar.footer.action` slot 注册，注册失败才降级 DOM 注入
+- client 构建产物收敛为单文件，`dsh-invoke/client` 的运行时与类型导出路径随之对齐
+
 ## [0.2.0] - 2026-08-17
 
 ### 新增
@@ -30,5 +39,6 @@
 - `/alias` 别名系统，快速调用提示词
 - 侧边栏 GUI（WebviewPanel）
 
+[0.2.1]: https://github.com/Melosic/dsh-invoke/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Melosic/dsh-invoke/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Melosic/dsh-invoke/releases/tag/v0.1.0
