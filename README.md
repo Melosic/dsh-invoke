@@ -2,38 +2,65 @@
 
 **English** | [中文](README.zh.md)
 
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+![dsh plugin](https://img.shields.io/badge/dsh-plugin-4263eb.svg)
+![Maintenance: paused](https://img.shields.io/badge/maintenance-paused-orange.svg)
+
 Prompt Vault & Invoker for DeepSeek Harness
 
-A DeepSeek Harness community plugin for managing and invoking prompts — summon your best prompts with one click.
+Prompt management & quick invocation for DeepSeek Harness.
 
 dsh-invoke focuses on prompt management and invocation. It ships with one built-in example prompt as a reference template, and lets you freely add, edit, delete, view, search, and categorize your own prompts.
 
 The plugin runs as a **Host + Client two-part plugin**: the Host side (Node) registers HTTP routes and DSH commands; the Client side (browser) injects a sidebar entry into Harness and mounts a React panel. The two communicate over the same-origin `/api/dsh-invoke/*`.
 
+> **Project nature**: dsh-invoke is an independently maintained open-source community project built on the DeepSeek Harness plugin ecosystem. This project has no affiliation, cooperation, authorization, or endorsement relationship with DeepSeek.
+
+> **Maintenance status**: This plugin depends on DeepSeek Harness (dsh), which is currently in [developer preview](https://github.com/deepseek-ai/deepseek-harness/blob/master/README.md) and evolves rapidly with potentially breaking changes. This project is therefore **paused for active maintenance** and may not work on the latest dsh. Maintenance resumes once the dsh repository stabilizes.
+
 ## Features
 
 - **Sidebar GUI first**: add / edit / delete / view / search / category management, all visual.
+
 - **Flexible panel modes**: opens as a side drawer by default so the chat stays visible — paste right after copying; switch to a centered dialog anytime. Close via mask click or `Esc`, and the mode is remembered per browser.
+
 - **Quick invoke (copy to clipboard)**: click "Copy" → fill variables → copy → paste and send. Independent of Harness's internal DOM, 100% compatible.
+
 - **Variable substitution**: Mustache-style `{{var}}` placeholders, filled interactively via a dialog on invoke. (Auto-extraction from the editor selection is planned — the extraction engine is ready, waiting for a selection API from the host.)
+
 - **Category tree + live search**: left-hand category filter, top search box with real-time filtering (title / description / tags / body), with matched-keyword highlighting.
+
 - **Hover preview**: hover any card or row for 250ms to read the full prompt body in a floating popup — no clicking needed, and the popup never blocks what you're about to click.
+
 - **Compact / comfortable view toggle**: switch between the card grid and a dense single-line list from the search bar; the preference is remembered per browser.
+
 - **Light / dark theme**: follows Harness's `data-ds-dark-theme` mechanism automatically, with in-panel manual override.
+
 - **Two-layer storage merge**: user-level global storage + project-level storage, project-level wins.
+
 - **Import / export**: batch JSON / YAML import (merge / overwrite modes), export backup.
+
 - **Full command-line support**: `/prompt`, `/prompt-list`, `/alias` commands, plus `/<alias> [content]` quick invocation.
+
 - **Alias quick invocation**: bind an alias to a prompt, then `/<alias> content` renders and copies it in one step (variables auto-filled; conflict detection and cascade delete included).
+
 - **Usage stats & smart sorting**: ranked by a composite score of usage frequency and recency.
 
 ## Requirements
 
 - Node.js >= 22.19 (follows the DeepSeek Harness engine requirement)
+
 - DeepSeek Harness >= 0.1.0, < 0.2.0
 
-## Installation
+## Quick Installation
 
-The plugin mounts as a Cordis plugin. Give `cordis.patch.yml` to Harness's Cordis loader, or merge its content into your patch config:
+The plugin is not published to npm or pnpm yet. The recommended way is to ask the AI inside DeepSeek Harness **Creator mode** (the cordis preset), pasting the repository link:
+
+```text
+Install this plugin https://github.com/Melosic/dsh-invoke
+```
+
+dsh pulls the plugin from GitHub and mounts it automatically. To mount manually, the plugin runs as a Cordis plugin — merge the following entry into your patch config (`cordis.patch.yml`):
 
 ```yaml
 - insert:
@@ -43,73 +70,7 @@ The plugin mounts as a Cordis plugin. Give `cordis.patch.yml` to Harness's Cordi
         enabled: true
 ```
 
-Install the plugin:
-
-> The plugin is not published to npm or pnpm yet. The recommended way is to
-> ask the AI inside DeepSeek Harness **Creator mode** (the cordis preset),
-> pasting the repository link:
-
-```text
-Install this plugin https://github.com/Melosic/dsh-invoke
-```
-
-dsh pulls the plugin from GitHub and mounts it automatically. To mount an
-already-installed plugin manually, add the patch entry above.
-
-## Local Development / From Source
-
-If you want to develop the plugin locally or run it without publishing to npm:
-
-1. **Install DeepSeek Harness globally**:
-   ```bash
-   npm install -g @deepseek-ai/dsh
-   ```
-
-2. **Clone the repository and install dependencies**:
-   ```bash
-   git clone https://github.com/Melosic/dsh-invoke.git
-   cd dsh-invoke
-   npm install
-   ```
-
-3. **Build the plugin**:
-   ```bash
-   npm run build          # Host build (tsc -p tsconfig.json)
-   npm run build:client   # Client build (tsdown / esbuild)
-   ```
-
-4. **Create a DSH profile** (skip if you already have one):
-   ```bash
-   dsh --profile web --help   # creates ~/.dsh/profiles/web/ on first run
-   ```
-
-5. **Link the plugin into the profile**:
-   Edit `~/.dsh/profiles/web/package.json` and add `@dsh-external/dsh-invoke` to dependencies:
-   ```json
-   "dependencies": {
-     "@dsh-external/dsh-invoke": "link:/absolute/path/to/dsh-invoke"
-   }
-   ```
-   Then install the profile dependencies:
-   ```bash
-   dsh plugin --profile web install
-   ```
-
-6. **Add the plugin mount entry** to `~/.dsh/profiles/web/cordis.patch.yml`:
-   ```yaml
-   - insert:
-       - id: dsh-invoke
-         name: dsh-invoke
-         config:
-           enabled: true
-   ```
-
-7. **Start Harness with the plugin**:
-   ```bash
-   dsh --profile web --port 8080
-   ```
-
-Open `http://127.0.0.1:8080/` in your browser. The **Prompt Vault** entry button should appear in the sidebar automatically, directly above the Settings button.
+For source builds and local development, see [Contributing](CONTRIBUTING.md).
 
 ## Quick Start
 
@@ -122,207 +83,37 @@ Open `http://127.0.0.1:8080/` in your browser. The **Prompt Vault** entry button
 
 The plugin ships with one example prompt, usable directly or as a template:
 
-| Field | Value |
-| --- | --- |
-| ID | `code-review` |
-| Title | 代码审查 (Code Review) |
-| Description | 审查代码中的潜在问题，包括逻辑错误、安全漏洞、性能问题 |
-| Category | 开发 (Development) |
-| Tags | `review` `quality` `security` |
-| Body | 请审查以下代码，重点关注：1. 逻辑错误 2. 安全漏洞 3. 性能问题（正文以 `{{code}}` 引用代码） |
-| Variable | `code` (text input, required) |
+| Field       | Value                                                     |
+| ----------- | --------------------------------------------------------- |
+| ID          | `code-review`                                             |
+| Title       | 代码审查 (Code Review)                                        |
+| Description | 审查代码中的潜在问题，包括逻辑错误、安全漏洞、性能问题                               |
+| Category    | 开发 (Development)                                          |
+| Tags        | `review` `quality` `security`                             |
+| Body        | 请审查以下代码，重点关注：1. 逻辑错误 2. 安全漏洞 3. 性能问题（正文以 `{{code}}` 引用代码） |
+| Variable    | `code` (text input, required)                             |
 
-## Command-Line Usage (Optional)
+## Documentation
 
-Most operations can be done via the sidebar; the command line targets keyboard-driven users and fallback scenarios. Current commands:
+- [Command-Line Usage & Alias System](docs/en/guide/cli-and-alias.md) — `/prompt`, `/prompt-list`, `/alias`, `/<alias>` commands and alias rules
 
-| Command | Description |
-| --- | --- |
-| `/prompt` | List all prompts (with category, built-in marker, description) |
-| `/prompt-list` | List all prompts grouped by category |
-| `/alias` | List all registered aliases and the prompts they point to |
-| `/<alias> [content]` | Invoke the aliased prompt: renders it and copies to the clipboard |
+- [Data Storage](docs/en/guide/storage.md) — two-layer storage, merge strategy, storage format, cwd resolution, and prompt ID rules
 
-### Alias System
+- [Architecture & Security Model](docs/en/architecture-and-security.md) — Host + Client structure, source layout, three HTTP guards
 
-- Open the alias dialog via the link-icon action on a prompt card (or by clicking the alias badge on the card). Each prompt can be bound to one alias.
-- Alias rules: lowercase letters / digits / hyphens; must not collide with reserved commands (`prompt`, `prompt-list`, `alias`, `help`, `clear`, `exit`) or existing aliases. Validated server-side.
-- Invocation: `/<alias> content` — the text after the command fills the template variables. A **single-variable** prompt receives the whole text; a **multi-variable** prompt splits it in declaration order using `||`. Missing required variables produce a usage hint.
-- On success the rendered prompt is copied to the system clipboard (when the clipboard is unavailable, the body is echoed for manual copy) and the usage counter increments.
-- Deleting a prompt cascades to delete its alias.
-- Alias data lives in the user-level `aliases.json` (global, not workspace-scoped).
+- [FAQ](docs/en/faq.md) and [Version Compatibility](docs/en/faq.md#version-compatibility)
 
-## Data Storage
-
-- **User-level (writable)**: `~/.dsh/prompts.user.json` (resolved via `@deepseek-ai/dsh-home-paths`)
-- **Project-level (writable, higher priority)**: `.harness/prompts.json`
-- **Aliases**: user-level `aliases.json` (global)
-
-> Note: how the project root is resolved. In **command invocations** (`/prompt`, `/prompt-list`, `/<alias>`), project-level storage follows the invoking session's real working directory (`agent.session.header.cwd`). Over **HTTP** (`/api/dsh-invoke/*`), callers may pass an explicit `?cwd=` (or `cwd` in the JSON body); when omitted it falls back to the Host process working directory captured once at plugin load. `GET /api/dsh-invoke/workspace` reports the resolved root, the project storage path, and whether the directory is a registered dsh workspace. Imports (merge/overwrite) follow the same write-layer policy as creating prompts: project-level when a workspace exists, otherwise user-level.
->
-> Prompt IDs: the sidebar UI generates UUIDs (`crypto.randomUUID`) when creating prompts. The HTTP API does **not** generate ids — direct `POST /api/dsh-invoke/prompts` calls must supply a unique `id` (400 otherwise).
-
-### Merge Strategy
-
-Project-level config takes priority over user-level; for a duplicate ID, the project-level prompt wins. When no workspace is open, only user-level storage is loaded.
-
-Example storage format:
-
-```json
-{
-  "version": 1,
-  "categories": ["开发", "测试", "文档", "效率"],
-  "customCategories": ["AI辅助"],
-  "prompts": [
-    {
-      "id": "code-review",
-      "title": "代码审查",
-      "description": "审查代码中的潜在问题",
-      "category": "开发",
-      "tags": ["review", "quality"],
-      "body": "请审查以下代码：\n{{code}}",
-      "variables": [{ "name": "code", "type": "text", "required": true }],
-      "builtin": true,
-      "usageCount": 0,
-      "createdAt": "2026-01-15T10:00:00Z",
-      "updatedAt": "2026-08-13T14:30:00Z"
-    }
-  ]
-}
-```
-
-## Technical Architecture
-
-The plugin uses a **Host + Client** two-part structure, following DeepSeek Harness community plugin conventions:
-
-```
-             DeepSeek Harness
-        ┌────────────────────┐
-        │  Host side (Node)  │
-        │  src/index.ts       │
-        │   ├─ host/routes.ts │◄── HTTP /api/dsh-invoke/*
-        │   ├─ commands/*     │◄── DSH commands /prompt /alias
-        │   ├─ storage/*      │── two-layer storage merge
-        │   └─ engine/*       │── templates / import-export
-        └────────┬───────────┘
-                 │ same-origin fetch
-        ┌────────┴───────────┐
-        │  Client (browser)  │
-        │  src/client/index.ts│── sidebar injection + panel mount
-        │  src/client/api.ts │── fetch wrapper
-        │  src/ui/*          │── React panel (light/dark)
-        └────────────────────┘
-```
-
-### Security Model
-
-All HTTP routes (`/api/dsh-invoke/*`) pass through three request guards (see `src/host/routes.ts`):
-
-| Guard | Scope | Protects against |
-|---|---|---|
-| Host allowlist (local/LAN addresses only) | All requests | DNS rebinding (attacker domain re-resolving to loopback) |
-| Same-origin check (`Sec-Fetch-Site` + `Origin` vs Host) | Write operations | CSRF (malicious cross-site POST/PUT/DELETE) |
-| cwd allowlist | Requests with explicit `?cwd=` | Arbitrary directory writes |
-
-The cwd allowlist has three tiers by priority: registered dsh workspace when the registry is available (strongest); subtree of the initialized workspace when the registry is unavailable; any existing directory as a documented degradation when neither anchor exists (the HTTP surface remains covered by the first two guards). Request bodies are capped at 10MB, and storage writes use atomic replace with a `.bak` backup.
-
-### Source Layout
-
-```
-dsh-invoke/
-├── package.json
-├── cordis.patch.yml        # plugin mount patch
-├── tsconfig.json           # Host build
-├── tsconfig.client.json    # Client build
-├── src/
-│   ├── index.ts            # Host plugin entry
-│   ├── host/
-│   │   └── routes.ts       # HTTP route layer (CRUD API)
-│   ├── client/
-│   │   ├── index.ts        # Browser entry (sidebar injection + mount)
-│   │   └── api.ts          # fetch API wrapper
-│   ├── storage/
-│   │   ├── context.ts      # storage context (workspace/path config)
-│   │   ├── manager.ts      # two-layer merge + CRUD + smart sorting
-│   │   └── alias-store.ts  # alias storage (CRUD + conflict detection + cascade delete)
-│   ├── engine/
-│   │   ├── template.ts     # variable substitution ({{var}})
-│   │   ├── variable-resolver.ts  # variable extraction (experimental)
-│   │   └── import-export.ts  # JSON / YAML import-export
-│   ├── commands/
-│   │   ├── prompt.ts       # main command registration
-│   │   ├── alias.ts        # /alias listing + dynamic /<alias> command registration & invocation
-│   │   └── clipboard.ts    # cross-platform clipboard copy (Node child_process)
-│   └── ui/
-│       ├── theme.ts        # theme adaptation (light/dark)
-│       ├── icons.tsx       # Feather Icons inline SVG
-│       ├── styles.ts       # design system (CSS variables)
-│       ├── WebviewPanel.tsx  # main panel (React 18)
-│       └── components/     # cards, forms, category tree, variable/import dialogs
-└── tests/                  # Jest unit tests
-```
-
-## Development
-
-```bash
-npm install
-npm run build          # Host build (tsc -p tsconfig.json)
-npm run build:client   # Client build (tsc -p tsconfig.client.json)
-npm run test           # run Jest unit tests
-```
-
-## Roadmap
-
-| Priority | Module | Status |
-| --- | --- | --- |
-| P0 | Core CRUD (add/edit/delete/query) | Done |
-| P0 | Copy to clipboard + variable fill | Done |
-| P0 | Category tree management & live search | Done |
-| P0 | Light/dark theme auto-adaptation | Done |
-| P1 | Import / export | Done (JSON / YAML) |
-| P1 | 2-column grid card layout | Done |
-| P1 | Variable substitution ({{var}}) | Done |
-| P1 | Sidebar GUI (Host + Client) | Done |
-| P1 | Alias system (with conflict detection) | Done |
-| P2 | Project-level auto-load & two-layer merge | Done |
-| P2 | Usage stats & smart sorting | Done |
-| P2 | AI-assisted prompt generation (experimental) | Planned |
-
-## FAQ
-
-**Q: After copying to the clipboard, can it auto-paste into the input box?**
-
-A: The current version uses manual paste for stability. Once Harness officially exposes an input-write API, we will support it right away.
-
-**Q: Can the built-in example prompt be deleted?**
-
-A: Yes. The example prompt supports edit and delete just like user-defined prompts.
-
-**Q: If both project-level and user-level exist, which wins?**
-
-A: Project-level takes priority; for a duplicate ID, the project-level config wins.
-
-**Q: How do I use auto variable extraction? Why does it sometimes not work?**
-
-A: Auto-extraction is planned and not yet wired up: the extraction engine is implemented, but the current Harness web client exposes no editor-selection API, so the dialog always asks for manual input. It will light up automatically once the host provides selection access.
-
-**Q: Do I have to use the command line?**
-
-A: No. All operations can be done through the sidebar GUI; the command line is an optional fallback for keyboard-driven users and degraded scenarios.
-
-## Version Compatibility
-
-The v0.2.x series is compatible with DeepSeek Harness >=0.1.0 <0.2.0. When Harness ships a major update, we will adapt promptly — follow the GitHub Releases page.
+- [Roadmap](ROADMAP.md)
 
 ## Contributing
 
-Issues and PRs are welcome:
+Issues and PRs are welcome. For local development, build commands, and the contribution workflow, see [Contributing](CONTRIBUTING.md).
 
-1. Fork this repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'feat: add amazing feature'` (follow Conventional Commits)
-4. Push the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+## Community
+
+- Discover more DeepSeek Harness plugins under the [dsh-plugin topic](https://github.com/topics/dsh-plugin).
+
+- Report issues or share suggestions via [GitHub Issues](https://github.com/Melosic/dsh-invoke/issues).
 
 ## License
 
